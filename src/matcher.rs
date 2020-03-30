@@ -10,7 +10,7 @@ impl<'i> parser::Parser<'i> for SelectorParser {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Selector;
+pub struct Selector;
 
 impl parser::SelectorImpl for Selector {
     type ExtraMatchingData = String;
@@ -29,7 +29,7 @@ impl parser::SelectorImpl for Selector {
 }
 
 #[derive(Clone, Eq, PartialEq)]
-pub(crate) struct NonTSPseudoClass;
+pub struct NonTSPseudoClass;
 
 impl parser::NonTSPseudoClass for NonTSPseudoClass {
     type Impl = Selector;
@@ -57,7 +57,7 @@ impl cssparser::ToCss for NonTSPseudoClass {
 }
 
 #[derive(Clone, Eq, PartialEq)]
-pub(crate) struct PseudoElement;
+pub struct PseudoElement;
 
 impl parser::PseudoElement for PseudoElement {
     type Impl = Selector;
