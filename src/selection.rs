@@ -1,8 +1,6 @@
 use crate::document::NodeRef;
 use crate::document::Tree;
-use crate::matcher::SelectorParser;
-use cssparser::{Parser, ParserInput};
-use selectors::parser::SelectorList;
+
 use std::cell::RefCell;
 
 pub struct Selection<'a, T> {

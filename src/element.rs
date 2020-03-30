@@ -51,12 +51,15 @@ impl<'a> selectors::Element for NodeRef<'a, NodeData> {
         false
     }
 
-    fn has_local_name(&self, local_name: &<Self::Impl as SelectorImpl>::BorrowedLocalName) -> bool {
+    fn has_local_name(
+        &self,
+        _local_name: &<Self::Impl as SelectorImpl>::BorrowedLocalName,
+    ) -> bool {
         false
     }
 
     // Empty string for no namespace.
-    fn has_namespace(&self, ns: &<Self::Impl as SelectorImpl>::BorrowedNamespaceUrl) -> bool {
+    fn has_namespace(&self, _ns: &<Self::Impl as SelectorImpl>::BorrowedNamespaceUrl) -> bool {
         false
     }
 
@@ -90,9 +93,9 @@ impl<'a> selectors::Element for NodeRef<'a, NodeData> {
 
     fn match_non_ts_pseudo_class<F>(
         &self,
-        pc: &<Self::Impl as SelectorImpl>::NonTSPseudoClass,
-        context: &mut MatchingContext<Self::Impl>,
-        flags_setter: &mut F,
+        _pc: &<Self::Impl as SelectorImpl>::NonTSPseudoClass,
+        _context: &mut MatchingContext<Self::Impl>,
+        _flags_setter: &mut F,
     ) -> bool
     where
         F: FnMut(&Self, ElementSelectorFlags),
@@ -102,8 +105,8 @@ impl<'a> selectors::Element for NodeRef<'a, NodeData> {
 
     fn match_pseudo_element(
         &self,
-        pe: &<Self::Impl as SelectorImpl>::PseudoElement,
-        context: &mut MatchingContext<Self::Impl>,
+        _pe: &<Self::Impl as SelectorImpl>::PseudoElement,
+        _context: &mut MatchingContext<Self::Impl>,
     ) -> bool {
         false
     }
@@ -154,7 +157,7 @@ impl<'a> selectors::Element for NodeRef<'a, NodeData> {
     // Returns the mapping from the `exportparts` attribute in the regular direction, that is, inner-tree->outer-tree.
     fn exported_part(
         &self,
-        name: &<Self::Impl as SelectorImpl>::PartName,
+        _name: &<Self::Impl as SelectorImpl>::PartName,
     ) -> Option<<Self::Impl as SelectorImpl>::PartName> {
         None
     }
@@ -162,12 +165,12 @@ impl<'a> selectors::Element for NodeRef<'a, NodeData> {
     // Returns the mapping from the `exportparts` attribute in the regular direction, that is, outer-tree->inner-tree.
     fn imported_part(
         &self,
-        name: &<Self::Impl as SelectorImpl>::PartName,
+        _name: &<Self::Impl as SelectorImpl>::PartName,
     ) -> Option<<Self::Impl as SelectorImpl>::PartName> {
         None
     }
 
-    fn is_part(&self, name: &<Self::Impl as SelectorImpl>::PartName) -> bool {
+    fn is_part(&self, _name: &<Self::Impl as SelectorImpl>::PartName) -> bool {
         false
     }
 

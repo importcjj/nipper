@@ -6,9 +6,9 @@ use crate::document::NodeRef;
 use crate::document::Tree;
 use markup5ever::interface::tree_builder;
 use markup5ever::interface::tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink};
-use markup5ever::serialize::TraversalScope;
-use markup5ever::serialize::TraversalScope::{ChildrenOnly, IncludeNode};
-use markup5ever::serialize::{Serialize, Serializer};
+
+
+
 use markup5ever::Attribute;
 use markup5ever::ExpandedName;
 use markup5ever::QualName;
@@ -277,6 +277,6 @@ mod tests {
 
         let dom: Document = Default::default();
         let parser = parse_document(dom, Default::default());
-        let document = parser.one(html);
+        let _document = parser.one(html);
     }
 }

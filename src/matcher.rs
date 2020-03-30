@@ -1,4 +1,3 @@
-use cssparser::ToCss;
 use html5ever::{LocalName, Namespace};
 use selectors::parser;
 use std::fmt;
