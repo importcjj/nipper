@@ -7,14 +7,15 @@ use crate::document::Tree;
 use markup5ever::interface::tree_builder;
 use markup5ever::interface::tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink};
 
-
-
 use markup5ever::Attribute;
 use markup5ever::ExpandedName;
 use markup5ever::QualName;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use tendril::StrTendril;
+use tendril::TendrilSink;
+
+use html5ever::parse_document;
 
 fn append_to_existing_text(prev: &mut Node<NodeData>, text: &str) -> bool {
     match prev.data {
@@ -27,7 +28,7 @@ fn append_to_existing_text(prev: &mut Node<NodeData>, text: &str) -> bool {
 }
 
 pub struct Document {
-    tree: Tree<NodeData>,
+    pub tree: Tree<NodeData>,
     /// Errors that occurred during parsing.
     pub errors: Vec<Cow<'static, str>>,
 
@@ -48,6 +49,12 @@ impl Default for Document {
 impl Document {
     pub fn root(&self) -> NodeRef<NodeData> {
         self.tree.root()
+    }
+}
+
+impl Document {
+    pub fn from_str(html: &str) -> Document {
+        parse_document(Document::default(), Default::default()).one(html)
     }
 }
 

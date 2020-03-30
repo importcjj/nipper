@@ -1,4 +1,4 @@
-use crate::matcher::Selector;
+use crate::matcher::InnerSelector;
 
 use crate::document::{NodeData, NodeRef};
 use selectors::attr::AttrSelectorOperation;
@@ -11,7 +11,7 @@ use selectors::OpaqueElement;
 use std::ops::Deref;
 
 impl<'a> selectors::Element for NodeRef<'a, NodeData> {
-    type Impl = Selector;
+    type Impl = InnerSelector;
 
     // Converts self into an opaque representation.
     fn opaque(&self) -> OpaqueElement {
@@ -51,10 +51,11 @@ impl<'a> selectors::Element for NodeRef<'a, NodeData> {
         false
     }
 
-    fn has_local_name(
-        &self,
-        _local_name: &<Self::Impl as SelectorImpl>::BorrowedLocalName,
-    ) -> bool {
+    fn has_local_name(&self, local_name: &<Self::Impl as SelectorImpl>::BorrowedLocalName) -> bool {
+        if let NodeData::Element(ref e) = self.node.data {
+            return &e.name.local == local_name;
+        }
+
         false
     }
 

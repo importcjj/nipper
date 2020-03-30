@@ -1,20 +1,30 @@
+use crate::document::NodeData;
 use crate::document::NodeRef;
-use crate::document::Tree;
-
+use crate::matcher::Matcher;
+use crate::Document;
 use std::cell::RefCell;
 
-pub struct Selection<'a, T> {
-    nodes: Vec<NodeRef<'a, T>>,
-    tree: RefCell<Tree<T>>,
+impl Document {
+    pub fn find(&self, sel: &str) -> Selection {
+        let matcher = Matcher::new(sel).unwrap();
+
+        let nodes: Vec<NodeRef<NodeData>> = self
+            .tree
+            .nodes()
+            .iter()
+            .enumerate()
+            .map(|(i, node)| NodeRef::new(i, node, &self.tree))
+            .filter(|element| matcher.match_element(element))
+            .collect();
+
+        Selection {
+            nodes,
+            // tree: RefCell:
+        }
+    }
 }
-
-// impl<'a, T> Selection<'a, T> {
-//     fn find(&self, selector: &str) -> Self {
-//         let mut parser_input = ParserInput::new(selector);
-//         let mut parser = Parser::new(&mut parser_input);
-
-//         let selector = SelectorList::parse(&SelectorParser, &mut parser).unwrap();
-
-//         return Selection {};
-//     }
-// }
+#[derive(Debug)]
+pub struct Selection<'a> {
+    nodes: Vec<NodeRef<'a, NodeData>>,
+    // tree: RefCell<Tree<NodeData>>,
+}

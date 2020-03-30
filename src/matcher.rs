@@ -1,17 +1,45 @@
+use cssparser::ParseError;
 use html5ever::{LocalName, Namespace};
-use selectors::parser;
+use selectors::matching;
+use selectors::parser::{self, Selector, SelectorParseErrorKind};
+use selectors::Element;
 use std::fmt;
-pub(crate) struct SelectorParser;
 
-impl<'i> parser::Parser<'i> for SelectorParser {
-    type Impl = Selector;
+pub(crate) struct Matcher {
+    selector: Selector<InnerSelector>,
+}
+
+impl Matcher {
+    pub(crate) fn new(sel: &str) -> Result<Self, ParseError<SelectorParseErrorKind>> {
+        let mut input = cssparser::ParserInput::new(sel);
+        let mut parser = cssparser::Parser::new(&mut input);
+        selectors::parser::Selector::parse(&InnerSelectorParser, &mut parser)
+            .map(|selector| Matcher { selector })
+    }
+
+    pub(crate) fn match_element<E: Element<Impl = InnerSelector>>(&self, element: &E) -> bool {
+        let mut ctx = matching::MatchingContext::new(
+            matching::MatchingMode::Normal,
+            None,
+            None,
+            matching::QuirksMode::NoQuirks,
+        );
+
+        matching::matches_selector(&self.selector, 0, None, element, &mut ctx, &mut |_, _| {})
+    }
+}
+
+pub(crate) struct InnerSelectorParser;
+
+impl<'i> parser::Parser<'i> for InnerSelectorParser {
+    type Impl = InnerSelector;
     type Error = parser::SelectorParseErrorKind<'i>;
 }
 
 #[derive(Debug, Clone)]
-pub struct Selector;
+pub struct InnerSelector;
 
-impl parser::SelectorImpl for Selector {
+impl parser::SelectorImpl for InnerSelector {
     type ExtraMatchingData = String;
     type AttrValue = String;
     type Identifier = LocalName;
@@ -31,7 +59,7 @@ impl parser::SelectorImpl for Selector {
 pub struct NonTSPseudoClass;
 
 impl parser::NonTSPseudoClass for NonTSPseudoClass {
-    type Impl = Selector;
+    type Impl = InnerSelector;
 
     fn is_active_or_hover(&self) -> bool {
         false
@@ -59,7 +87,7 @@ impl cssparser::ToCss for NonTSPseudoClass {
 pub struct PseudoElement;
 
 impl parser::PseudoElement for PseudoElement {
-    type Impl = Selector;
+    type Impl = InnerSelector;
 }
 
 impl cssparser::ToCss for PseudoElement {

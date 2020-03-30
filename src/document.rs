@@ -1,3 +1,5 @@
+use html5ever::serialize;
+use html5ever::serialize::SerializeOpts;
 use markup5ever::serialize::TraversalScope;
 use markup5ever::serialize::TraversalScope::{ChildrenOnly, IncludeNode};
 use markup5ever::serialize::{Serialize, Serializer};
@@ -41,6 +43,10 @@ impl<T> Tree<T> {
         Self {
             nodes: vec![Node::new(root)],
         }
+    }
+
+    pub fn nodes(&self) -> &[Node<T>] {
+        &self.nodes
     }
 
     pub fn get(&self, id: &NodeId) -> Option<NodeRef<T>> {
@@ -163,6 +169,14 @@ pub struct NodeRef<'a, T> {
 }
 
 impl<'a, T> NodeRef<'a, T> {
+    pub fn new(id: usize, node: &'a Node<T>, tree: &'a Tree<T>) -> Self {
+        Self {
+            id: NodeId::new(id),
+            node,
+            tree,
+        }
+    }
+
     pub fn children(&self) -> Vec<NodeRef<'a, T>> {
         let first_child_id = self.node.first_child;
         let mut next_child_id = first_child_id;
@@ -182,6 +196,25 @@ impl<'a, T> NodeRef<'a, T> {
 
     pub fn parent(&self) -> Option<Self> {
         self.node.parent.map(|id| self.tree.get_unchecked(&id))
+    }
+}
+
+impl<'a> NodeRef<'a, NodeData> {
+    pub fn to_html(&self) -> StrTendril {
+        let inner: SerializableNodeRef = self.clone().into();
+
+        let mut result = vec![];
+        serialize(
+            &mut result,
+            &inner,
+            SerializeOpts {
+                scripting_enabled: true,
+                traversal_scope: TraversalScope::IncludeNode,
+                create_missing_parent: false,
+            },
+        )
+        .unwrap();
+        StrTendril::try_from_byte_slice(&result).unwrap()
     }
 }
 
@@ -452,7 +485,7 @@ impl<'a> Serialize for SerializableNodeRef<'a> {
                         ref contents,
                     } => serializer.write_processing_instruction(target, contents)?,
 
-                    &NodeData::Document => panic!("Can't serialize Document node itself"),
+                    &NodeData::Document => continue,
                 },
 
                 SerializeOp::Close(name) => {
