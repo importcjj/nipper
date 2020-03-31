@@ -1,11 +1,15 @@
+use crate::document::{NodeData, NodeId, NodeRef};
 use cssparser::ParseError;
 use html5ever::{LocalName, Namespace};
 use selectors::matching;
+
 use selectors::parser::{self, Selector, SelectorParseErrorKind};
 use selectors::Element;
+use std::collections::HashSet;
 use std::fmt;
 
-pub(crate) struct Matcher {
+#[derive(Clone, Debug)]
+pub struct Matcher {
     selector: Selector<InnerSelector>,
 }
 
@@ -26,6 +30,56 @@ impl Matcher {
         );
 
         matching::matches_selector(&self.selector, 0, None, element, &mut ctx, &mut |_, _| {})
+    }
+
+    pub(crate) fn match_all<'a>(&self, element: NodeRef<'a, NodeData>) -> MatchAll<'a> {
+        MatchAll::new(vec![element], self)
+    }
+
+    pub(crate) fn match_alls<'a>(&self, elements: Vec<NodeRef<'a, NodeData>>) -> MatchAll<'a> {
+        MatchAll::new(elements, self)
+    }
+}
+
+
+
+pub struct MatchAll<'a> {
+    nodes: Vec<NodeRef<'a, NodeData>>,
+    matcher: Matcher,
+    set: HashSet<NodeId>,
+}
+
+impl<'a> MatchAll<'a> {
+    fn new(nodes: Vec<NodeRef<'a, NodeData>>, matcher: Matcher) -> Self {
+        Self {
+            nodes,
+            matcher,
+            set: HashSet::new(),
+        }
+    }
+}
+
+impl<'a> Iterator for MatchAll<'a> {
+    type Item = NodeRef<'a, NodeData>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while !self.nodes.is_empty() {
+            let node = self.nodes.remove(0);
+            for node in node.children() {
+                self.nodes.insert(0, node);
+            }
+
+            if self.matcher.match_element(&node) {
+                if self.set.contains(&node.id) {
+                    continue;
+                }
+
+                self.set.insert(node.id);
+                return Some(node);
+            }
+        }
+
+        None
     }
 }
 

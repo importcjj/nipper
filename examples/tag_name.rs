@@ -10,10 +10,11 @@ fn main() {
 "#;
 
     let document = Document::from_str(html);
-    let selection = document.find("li");
 
-    println!("{:?}", selection);
+    let items = document.find("ul").find("li");
 
-    let selection = document.find("ul");
-    println!("{:?}", selection);
+    for item in items.list() {
+        println!("{}", item.html());
+        println!("{}", item.text());
+    }
 }

@@ -9,7 +9,7 @@ use std::fmt::{self, Debug};
 use std::io;
 use tendril::StrTendril;
 
-#[derive(Copy, Debug, Clone, Eq, PartialEq)]
+#[derive(Copy, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct NodeId {
     value: usize,
 }
@@ -200,7 +200,7 @@ impl<'a, T> NodeRef<'a, T> {
 }
 
 impl<'a> NodeRef<'a, NodeData> {
-    pub fn to_html(&self) -> StrTendril {
+    pub fn html(&self) -> StrTendril {
         let inner: SerializableNodeRef = self.clone().into();
 
         let mut result = vec![];
@@ -215,6 +215,28 @@ impl<'a> NodeRef<'a, NodeData> {
         )
         .unwrap();
         StrTendril::try_from_byte_slice(&result).unwrap()
+    }
+
+    pub fn text(&self) -> StrTendril {
+        let mut ops = vec![self.clone()];
+        let mut text = StrTendril::new();
+        while !ops.is_empty() {
+            let node_ref = ops.remove(0);
+            match node_ref.node.data {
+                NodeData::Element(_) => {
+                    let children = node_ref.children();
+                    for child in children.into_iter().rev() {
+                        ops.insert(0, child);
+                    }
+                }
+
+                NodeData::Text { ref contents } => text.push_tendril(&contents),
+
+                _ => continue,
+            }
+        }
+
+        text
     }
 }
 
@@ -469,8 +491,8 @@ impl<'a> Serialize for SerializableNodeRef<'a> {
 
                         ops.insert(0, SerializeOp::Close(e.name.clone()));
 
-                        for child in node_ref.children().iter().rev() {
-                            ops.insert(0, SerializeOp::Open(child.clone()));
+                        for child in node_ref.children().into_iter().rev() {
+                            ops.insert(0, SerializeOp::Open(child));
                         }
                     }
 
