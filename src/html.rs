@@ -1,5 +1,5 @@
+use crate::document::append_to_existing_text;
 use crate::document::Element;
-use crate::document::Node;
 use crate::document::NodeData;
 use crate::document::NodeId;
 use crate::document::NodeRef;
@@ -16,16 +16,6 @@ use tendril::StrTendril;
 use tendril::TendrilSink;
 
 use html5ever::parse_document;
-
-fn append_to_existing_text(prev: &mut Node<NodeData>, text: &str) -> bool {
-    match prev.data {
-        NodeData::Text { ref mut contents } => {
-            contents.push_slice(text);
-            true
-        }
-        _ => false,
-    }
-}
 
 pub struct Document {
     pub tree: Tree<NodeData>,

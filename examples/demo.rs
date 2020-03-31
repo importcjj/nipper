@@ -6,5 +6,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let document = Document::from_str(&html);
 
+    for article in document.find(".article-list .item").iter() {
+        let title = article.find(".title");
+        let summary = article.find(".summary");
+        println!("title => {}", title.text());
+        println!("summary => {}", summary.text());
+    }
+
     Ok(())
 }

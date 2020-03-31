@@ -21,7 +21,10 @@ impl Matcher {
             .map(|selector| Matcher { selector })
     }
 
-    pub(crate) fn match_element<E: Element<Impl = InnerSelector>>(&self, element: &E) -> bool {
+    pub(crate) fn match_element<E>(&self, element: &E) -> bool
+    where
+        E: Element<Impl = InnerSelector>,
+    {
         let mut ctx = matching::MatchingContext::new(
             matching::MatchingMode::Normal,
             None,
@@ -32,40 +35,55 @@ impl Matcher {
         matching::matches_selector(&self.selector, 0, None, element, &mut ctx, &mut |_, _| {})
     }
 
-    pub(crate) fn match_all<'a>(&self, element: NodeRef<'a, NodeData>) -> MatchAll<'a> {
-        MatchAll::new(vec![element], self)
+    pub(crate) fn match_all<E, I>(self, elements: I) -> Matches<E>
+    where
+        E: Element<Impl = InnerSelector>,
+        I: Iterator<Item = E>,
+    {
+        Matches::from_list(elements, self)
     }
 
-    pub(crate) fn match_alls<'a>(&self, elements: Vec<NodeRef<'a, NodeData>>) -> MatchAll<'a> {
-        MatchAll::new(elements, self)
+    pub(crate) fn match_one<E>(self, element: E) -> Matches<E>
+    where
+        E: Element<Impl = InnerSelector>,
+    {
+        Matches::from_one(element, self)
     }
 }
 
-
-
-pub struct MatchAll<'a> {
-    nodes: Vec<NodeRef<'a, NodeData>>,
+#[derive(Debug, Clone)]
+pub struct Matches<T> {
+    nodes: Vec<T>,
     matcher: Matcher,
     set: HashSet<NodeId>,
 }
 
-impl<'a> MatchAll<'a> {
-    fn new(nodes: Vec<NodeRef<'a, NodeData>>, matcher: Matcher) -> Self {
+impl<T> Matches<T> {
+    pub fn from_one(node: T, matcher: Matcher) -> Self {
         Self {
-            nodes,
-            matcher,
+            nodes: vec![node],
+            matcher: matcher,
+            set: HashSet::new(),
+        }
+    }
+
+    pub fn from_list<I: Iterator<Item = T>>(nodes: I, matcher: Matcher) -> Self {
+        Self {
+            nodes: nodes.collect(),
+            matcher: matcher,
             set: HashSet::new(),
         }
     }
 }
 
-impl<'a> Iterator for MatchAll<'a> {
+impl<'a> Iterator for Matches<NodeRef<'a, NodeData>> {
     type Item = NodeRef<'a, NodeData>;
 
     fn next(&mut self) -> Option<Self::Item> {
         while !self.nodes.is_empty() {
             let node = self.nodes.remove(0);
-            for node in node.children() {
+
+            for node in node.children().into_iter().rev() {
                 self.nodes.insert(0, node);
             }
 

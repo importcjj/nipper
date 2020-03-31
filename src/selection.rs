@@ -1,9 +1,9 @@
-use crate::document::NodeData;
-use crate::document::NodeRef;
+use crate::document::Node;
 use crate::matcher::Matcher;
-use crate::matcher::MatchAll;
+use crate::matcher::Matches;
 use crate::Document;
-use std::cell::RefCell;
+use std::vec::IntoIter;
+use tendril::StrTendril;
 
 impl Document {
     pub fn find(&self, sel: &str) -> Selection {
@@ -13,39 +13,63 @@ impl Document {
 
     pub fn find_with_matcher<'a, 'b>(&'a self, matcher: &'b Matcher) -> Selection<'a> {
         let root = self.tree.root();
+        let nodes = Matches::from_one(root, matcher.clone()).collect();
 
-        let nodes = matcher.match_all(root).collect();
-        Selection {
-            nodes,
-            // tree: RefCell:
-        }
+        Selection { nodes }
     }
 }
 #[derive(Debug)]
 pub struct Selection<'a> {
-    matches: 
-    // tree: RefCell<Tree<NodeData>>,
+    nodes: Vec<Node<'a>>,
 }
 
 impl<'a> Selection<'a> {
     pub fn find(&self, sel: &str) -> Selection<'a> {
         let matcher = Matcher::new(sel).unwrap();
-        let nodes = matcher.match_alls(self.nodes.clone()).collect();
-        Selection {
-            nodes,
-            // tree: RefCell:
-        }
+        let nodes = matcher.match_all(self.nodes.clone().into_iter()).collect();
+
+        Selection { nodes }
     }
 
-    fn new_with_single_node(node: NodeRef<'a, NodeData>) -> Selection<'a> {
-        Self { nodes: vec![node] }
+    pub fn iter(&self) -> Selections<Node<'a>> {
+        Selections::new(self.nodes.clone().into_iter())
+    }
+
+    pub fn html(&self) -> StrTendril {
+        let mut s = StrTendril::new();
+
+        for node in &self.nodes {
+            s.push_tendril(&node.html());
+        }
+
+        s
+    }
+
+    pub fn text(&self) -> StrTendril {
+        let mut s = StrTendril::new();
+
+        for node in &self.nodes {
+            s.push_tendril(&node.text());
+        }
+
+        s
     }
 }
 
-impl<'a> Iterator for Selection<'a> {
+pub struct Selections<I> {
+    iter: IntoIter<I>,
+}
+
+impl<I> Selections<I> {
+    fn new(iter: IntoIter<I>) -> Self {
+        Self { iter }
+    }
+}
+
+impl<'a> Iterator for Selections<Node<'a>> {
     type Item = Selection<'a>;
 
-    fn next(&mut self) -> Self::Item {
-        
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|node| Selection { nodes: vec![node] })
     }
 }

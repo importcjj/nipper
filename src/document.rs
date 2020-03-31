@@ -9,6 +9,18 @@ use std::fmt::{self, Debug};
 use std::io;
 use tendril::StrTendril;
 
+pub type Node<'a> = NodeRef<'a, NodeData>;
+
+pub(crate) fn append_to_existing_text(prev: &mut InnerNode<NodeData>, text: &str) -> bool {
+    match prev.data {
+        NodeData::Text { ref mut contents } => {
+            contents.push_slice(text);
+            true
+        }
+        _ => false,
+    }
+}
+
 #[derive(Copy, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct NodeId {
     value: usize,
@@ -23,7 +35,7 @@ impl NodeId {
 impl NodeId {}
 
 pub struct Tree<T> {
-    nodes: Vec<Node<T>>,
+    nodes: Vec<InnerNode<T>>,
 }
 
 impl<T: Debug> Debug for Tree<T> {
@@ -41,11 +53,11 @@ impl<T> Tree<T> {
 
     pub fn new(root: T) -> Self {
         Self {
-            nodes: vec![Node::new(root)],
+            nodes: vec![InnerNode::new(root)],
         }
     }
 
-    pub fn nodes(&self) -> &[Node<T>] {
+    pub fn nodes(&self) -> &[InnerNode<T>] {
         &self.nodes
     }
 
@@ -82,15 +94,15 @@ impl<T> Tree<T> {
 
     pub fn new_node(&mut self, data: T) -> NodeId {
         let node_id = NodeId::new(self.nodes.len());
-        self.nodes.push(Node::new(data));
+        self.nodes.push(InnerNode::new(data));
         node_id
     }
 
-    pub fn node_mut(&mut self, id: &NodeId) -> &mut Node<T> {
+    pub fn node_mut(&mut self, id: &NodeId) -> &mut InnerNode<T> {
         unsafe { self.nodes.get_unchecked_mut(id.value) }
     }
 
-    pub fn node(&self, id: &NodeId) -> &Node<T> {
+    pub fn node(&self, id: &NodeId) -> &InnerNode<T> {
         unsafe { self.nodes.get_unchecked(id.value) }
     }
 
@@ -103,7 +115,7 @@ impl<T> Tree<T> {
     }
 }
 
-pub struct Node<T> {
+pub struct InnerNode<T> {
     pub parent: Option<NodeId>,
     pub prev_sibling: Option<NodeId>,
     pub next_sibling: Option<NodeId>,
@@ -112,9 +124,9 @@ pub struct Node<T> {
     pub data: T,
 }
 
-impl<T> Node<T> {
+impl<T> InnerNode<T> {
     fn new(data: T) -> Self {
-        Node {
+        InnerNode {
             parent: None,
             prev_sibling: None,
             next_sibling: None,
@@ -125,7 +137,7 @@ impl<T> Node<T> {
     }
 }
 
-impl Node<NodeData> {
+impl InnerNode<NodeData> {
     pub fn is_document(&self) -> bool {
         match self.data {
             NodeData::Document => true,
@@ -148,7 +160,7 @@ impl Node<NodeData> {
     }
 }
 
-impl<T: Debug> Debug for Node<T> {
+impl<T: Debug> Debug for InnerNode<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Node")
             .field("parnet", &self.parent)
@@ -164,12 +176,12 @@ impl<T: Debug> Debug for Node<T> {
 #[derive(Clone, Debug)]
 pub struct NodeRef<'a, T> {
     pub id: NodeId,
-    pub node: &'a Node<T>,
+    pub node: &'a InnerNode<T>,
     pub tree: &'a Tree<T>,
 }
 
 impl<'a, T> NodeRef<'a, T> {
-    pub fn new(id: usize, node: &'a Node<T>, tree: &'a Tree<T>) -> Self {
+    pub fn new(id: usize, node: &'a InnerNode<T>, tree: &'a Tree<T>) -> Self {
         Self {
             id: NodeId::new(id),
             node,
@@ -246,7 +258,7 @@ pub struct NodeRefMut<'a, T> {
 }
 
 impl<'a, T> NodeRefMut<'a, T> {
-    pub fn node(&mut self) -> &mut Node<T> {
+    pub fn node(&mut self) -> &mut InnerNode<T> {
         self.tree.node_mut(&self.id)
     }
 

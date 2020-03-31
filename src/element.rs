@@ -1,6 +1,6 @@
 use crate::matcher::InnerSelector;
 
-use crate::document::{NodeData, NodeRef};
+use crate::document::{Node, NodeData};
 use selectors::attr::AttrSelectorOperation;
 use selectors::attr::CaseSensitivity;
 use selectors::attr::NamespaceConstraint;
@@ -10,7 +10,7 @@ use selectors::parser::SelectorImpl;
 use selectors::OpaqueElement;
 use std::ops::Deref;
 
-impl<'a> selectors::Element for NodeRef<'a, NodeData> {
+impl<'a> selectors::Element for Node<'a> {
     type Impl = InnerSelector;
 
     // Converts self into an opaque representation.

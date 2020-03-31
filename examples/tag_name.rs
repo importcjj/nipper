@@ -13,8 +13,8 @@ fn main() {
 
     let items = document.find("ul").find("li");
 
-    for item in items.list() {
-        println!("{}", item.html());
-        println!("{}", item.text());
+    for item in items.iter() {
+        // println!("{}", item.html());
+        // println!("{}", item.text());
     }
 }
