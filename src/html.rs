@@ -74,15 +74,13 @@ impl TreeSink for Document {
     // Get a handle to a template's template contents. The tree builder promises this will never be called with
     // something else than a template element.
     fn get_template_contents(&mut self, target: &NodeId) -> NodeId {
-        if let NodeData::Element(Element {
-            template_contents: Some(ref contents),
-            ..
-        }) = self.tree.get(target).unwrap().node.data
-        {
-            contents.clone()
-        } else {
-            panic!("not a template element!")
-        }
+        self.tree.query_node(target, |node| match node.data {
+            NodeData::Element(Element {
+                template_contents: Some(ref contents),
+                ..
+            }) => contents.clone(),
+            _ => panic!("not a template element!"),
+        })
     }
 
     // Set the document's quirks mode.
@@ -98,10 +96,10 @@ impl TreeSink for Document {
     // What is the name of the element?
     // Should never be called on a non-element node; Feel free to `panic!`.
     fn elem_name(&self, target: &NodeId) -> ExpandedName {
-        match self.tree.node(target).data {
-            NodeData::Element(Element { ref name, .. }) => name.expanded(),
+        self.tree.query_node(target, |node| match node.data {
+            NodeData::Element(Element { .. }) => self.tree.get_name(target).expanded(),
             _ => panic!("not an element!"),
-        }
+        })
     }
 
     // Create an element.
@@ -115,27 +113,30 @@ impl TreeSink for Document {
         flags: ElementFlags,
     ) -> NodeId {
         let template_contents = if flags.template {
-            Some(self.tree.new_node(NodeData::Document))
+            Some(self.tree.create_node(NodeData::Document))
         } else {
             None
         };
 
-        self.tree.new_node(NodeData::Element(Element::new(
-            name,
+        let id = self.tree.create_node(NodeData::Element(Element::new(
+            name.clone(),
             attrs,
             template_contents,
             flags.mathml_annotation_xml_integration_point,
-        )))
+        )));
+
+        self.tree.set_name(id, name);
+        id
     }
 
     // Create a comment node.
     fn create_comment(&mut self, text: StrTendril) -> NodeId {
-        self.tree.new_node(NodeData::Comment { contents: text })
+        self.tree.create_node(NodeData::Comment { contents: text })
     }
 
     // Create a Processing Instruction node.
     fn create_pi(&mut self, target: StrTendril, data: StrTendril) -> NodeId {
-        self.tree.new_node(NodeData::ProcessingInstruction {
+        self.tree.create_node(NodeData::ProcessingInstruction {
             target: target,
             contents: data,
         })
@@ -147,17 +148,23 @@ impl TreeSink for Document {
     fn append(&mut self, parent: &NodeId, child: NodeOrText<NodeId>) {
         // Append to an existing Text node if we have one.
 
-        let mut parent = self.tree.get_unchecked_mut(parent);
         match child {
-            NodeOrText::AppendNode(node_id) => parent.append(&node_id),
+            NodeOrText::AppendNode(node_id) => self.tree.append_child_of(parent, &node_id),
             NodeOrText::AppendText(text) => {
-                if let Some(mut last_child) = parent.last_child() {
-                    if append_to_existing_text(last_child.node(), &text) {
-                        return;
-                    }
+                let last_child = self.tree.last_child_of(parent);
+                let concated = last_child
+                    .map(|child| {
+                        self.tree
+                            .update_node(&child.id, |node| append_to_existing_text(node, &text))
+                    })
+                    .unwrap_or(false);
+
+                if concated {
+                    return;
                 }
 
-                parent.append_with_data(NodeData::Text { contents: text });
+                self.tree
+                    .append_child_data_of(parent, NodeData::Text { contents: text })
             }
         }
     }
@@ -167,25 +174,29 @@ impl TreeSink for Document {
     // become the new node's previs sibling, could be a text node. If the new node is also a text node, the two
     // should be merged, as in the behavior of `append`.
     fn append_before_sibling(&mut self, sibling: &NodeId, child: NodeOrText<NodeId>) {
-        let mut sibling = self.tree.get_unchecked_mut(sibling);
-
         match child {
             NodeOrText::AppendText(text) => {
-                if let Some(mut prev_sibling_node) = sibling.prev_sibling() {
-                    if append_to_existing_text(prev_sibling_node.node(), &text) {
-                        return;
-                    }
+                let prev_sibling = self.tree.prev_sibling_of(sibling);
+                let concated = prev_sibling
+                    .map(|sibling| {
+                        self.tree
+                            .update_node(&sibling.id, |node| append_to_existing_text(node, &text))
+                    })
+                    .unwrap_or(false);
+
+                if concated {
+                    return;
                 }
 
-                // No previous node.
-                sibling.append_with_data(NodeData::Text { contents: text });
+                self.tree
+                    .append_child_data_of(sibling, NodeData::Text { contents: text })
             }
 
             // The tree builder promises we won't have a text node after
             // the insertion point.
 
             // Any other kind of node.
-            NodeOrText::AppendNode(node) => sibling.append(&node),
+            NodeOrText::AppendNode(node) => self.tree.append_child_of(sibling, &node),
         };
     }
 
@@ -198,7 +209,7 @@ impl TreeSink for Document {
         prev_element: &NodeId,
         child: NodeOrText<NodeId>,
     ) {
-        let has_parent = self.tree.get_unchecked_mut(element).parent().is_some();
+        let has_parent = self.tree.parent_of(element).is_some();
 
         if has_parent {
             self.append_before_sibling(element, child);
@@ -214,47 +225,46 @@ impl TreeSink for Document {
         public_id: StrTendril,
         system_id: StrTendril,
     ) {
-        let id = self.tree.new_node(NodeData::Doctype {
-            name: name,
-            public_id: public_id,
-            system_id: system_id,
-        });
-
-        self.tree.root_mut().append(&id);
+        let root = self.tree.root_id();
+        self.tree.append_child_data_of(
+            &root,
+            NodeData::Doctype {
+                name: name,
+                public_id: public_id,
+                system_id: system_id,
+            },
+        );
     }
 
     // Add each attribute to the given element, if no attribute with that name already exists. The tree builder
     // promises this will never be called with something else than an element.
     fn add_attrs_if_missing(&mut self, target: &NodeId, attrs: Vec<Attribute>) {
-        let existing = if let NodeData::Element(Element { ref mut attrs, .. }) =
-            self.tree.node_mut(target).data
-        {
-            attrs
-        } else {
-            panic!("not an element")
-        };
-
-        let existing_names = existing
-            .iter()
-            .map(|e| e.name.clone())
-            .collect::<HashSet<_>>();
-        existing.extend(
-            attrs
-                .into_iter()
-                .filter(|attr| !existing_names.contains(&attr.name)),
-        );
+        self.tree.update_node(target, |node| {
+            let existing = if let NodeData::Element(Element { ref mut attrs, .. }) = node.data {
+                attrs
+            } else {
+                panic!("not an element")
+            };
+            let existing_names = existing
+                .iter()
+                .map(|e| e.name.clone())
+                .collect::<HashSet<_>>();
+            existing.extend(
+                attrs
+                    .into_iter()
+                    .filter(|attr| !existing_names.contains(&attr.name)),
+            );
+        })
     }
 
     // Detach the given node from its parent.
     fn remove_from_parent(&mut self, target: &NodeId) {
-        self.tree.get_unchecked_mut(target).remove_from_parent();
+        self.tree.remove_from_parent(target);
     }
 
     // Remove all the children from node and append them to new_parent.
     fn reparent_children(&mut self, node: &NodeId, new_parent: &NodeId) {
-        self.tree
-            .get_unchecked_mut(node)
-            .reparent_children(new_parent);
+        self.tree.reparent_children_of(node, new_parent);
     }
 }
 

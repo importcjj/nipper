@@ -15,7 +15,7 @@ impl<'a> selectors::Element for Node<'a> {
 
     // Converts self into an opaque representation.
     fn opaque(&self) -> OpaqueElement {
-        OpaqueElement::new(&self.node.data)
+        OpaqueElement::new(&self.id)
     }
 
     fn parent_element(&self) -> Option<Self> {
@@ -52,11 +52,13 @@ impl<'a> selectors::Element for Node<'a> {
     }
 
     fn has_local_name(&self, local_name: &<Self::Impl as SelectorImpl>::BorrowedLocalName) -> bool {
-        if let NodeData::Element(ref e) = self.node.data {
-            return &e.name.local == local_name;
-        }
+        self.inner_query(|node| {
+            if let NodeData::Element(ref e) = node.data {
+                return &e.name.local == local_name;
+            }
 
-        false
+            false
+        })
     }
 
     // Empty string for no namespace.
@@ -66,14 +68,16 @@ impl<'a> selectors::Element for Node<'a> {
 
     // Whether this element and the `other` element have the same local name and namespace.
     fn is_same_type(&self, other: &Self) -> bool {
-        if let NodeData::Element(ref e1) = self.node.data {
-            return match other.node.data {
-                NodeData::Element(ref e2) => e1.name == e2.name,
-                _ => false,
-            };
-        }
+        self.tree.compare_node(&self.id, &other.id, |a, b| {
+            if let NodeData::Element(ref e1) = a.data {
+                return match b.data {
+                    NodeData::Element(ref e2) => e1.name == e2.name,
+                    _ => false,
+                };
+            }
 
-        false
+            false
+        })
     }
 
     fn attr_matches(
@@ -82,14 +86,16 @@ impl<'a> selectors::Element for Node<'a> {
         local_name: &<Self::Impl as SelectorImpl>::LocalName,
         operation: &AttrSelectorOperation<&<Self::Impl as SelectorImpl>::AttrValue>,
     ) -> bool {
-        if let NodeData::Element(ref e) = self.node.data {
-            return e.attrs.iter().any(|attr| match *ns {
-                NamespaceConstraint::Specific(url) if *url != attr.name.ns => false,
-                _ => *local_name == attr.name.local && operation.eval_str(&attr.value),
-            });
-        }
+        self.inner_query(|node| {
+            if let NodeData::Element(ref e) = node.data {
+                return e.attrs.iter().any(|attr| match *ns {
+                    NamespaceConstraint::Specific(url) if *url != attr.name.ns => false,
+                    _ => *local_name == attr.name.local && operation.eval_str(&attr.value),
+                });
+            }
 
-        false
+            false
+        })
     }
 
     fn match_non_ts_pseudo_class<F>(
@@ -127,14 +133,16 @@ impl<'a> selectors::Element for Node<'a> {
         name: &<Self::Impl as SelectorImpl>::Identifier,
         case_sensitivity: CaseSensitivity,
     ) -> bool {
-        if let NodeData::Element(ref e) = self.node.data {
-            return e.attrs.iter().any(|attr| {
-                attr.name.local.deref() == "id"
-                    && case_sensitivity.eq(name.as_bytes(), attr.value.as_bytes())
-            });
-        }
+        self.inner_query(|node| {
+            if let NodeData::Element(ref e) = node.data {
+                return e.attrs.iter().any(|attr| {
+                    attr.name.local.deref() == "id"
+                        && case_sensitivity.eq(name.as_bytes(), attr.value.as_bytes())
+                });
+            }
 
-        false
+            false
+        })
     }
 
     fn has_class(
@@ -142,17 +150,19 @@ impl<'a> selectors::Element for Node<'a> {
         name: &<Self::Impl as SelectorImpl>::ClassName,
         case_sensitivity: CaseSensitivity,
     ) -> bool {
-        if let NodeData::Element(ref e) = self.node.data {
-            return e
-                .attrs
-                .iter()
-                .find(|a| a.name.local.deref() == "class")
-                .map_or(vec![], |a| a.value.deref().split_whitespace().collect())
-                .iter()
-                .any(|c| case_sensitivity.eq(name.as_bytes(), c.as_bytes()));
-        }
+        self.inner_query(|node| {
+            if let NodeData::Element(ref e) = node.data {
+                return e
+                    .attrs
+                    .iter()
+                    .find(|a| a.name.local.deref() == "class")
+                    .map_or(vec![], |a| a.value.deref().split_whitespace().collect())
+                    .iter()
+                    .any(|c| case_sensitivity.eq(name.as_bytes(), c.as_bytes()));
+            }
 
-        false
+            false
+        })
     }
 
     // Returns the mapping from the `exportparts` attribute in the regular direction, that is, inner-tree->outer-tree.
@@ -180,11 +190,11 @@ impl<'a> selectors::Element for Node<'a> {
         !self
             .children()
             .iter()
-            .any(|child| child.node.is_element() || child.node.is_text())
+            .any(|child| child.is_element() || child.is_text())
     }
 
     // Whether this element matches `:root`, i.e. whether it is the root element of a document.
     fn is_root(&self) -> bool {
-        self.node.is_document()
+        self.is_document()
     }
 }

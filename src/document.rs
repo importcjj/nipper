@@ -5,6 +5,8 @@ use markup5ever::serialize::TraversalScope::{ChildrenOnly, IncludeNode};
 use markup5ever::serialize::{Serialize, Serializer};
 use markup5ever::Attribute;
 use markup5ever::QualName;
+use std::cell::Cell;
+use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::io;
 use tendril::StrTendril;
@@ -35,15 +37,32 @@ impl NodeId {
 impl NodeId {}
 
 pub struct Tree<T> {
-    nodes: Vec<InnerNode<T>>,
+    nodes: Cell<Vec<InnerNode<T>>>,
+    names: HashMap<NodeId, QualName>,
 }
 
 impl<T: Debug> Debug for Tree<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("Tree")
-            .field("nodes", &self.nodes)
-            .finish()
+        fmt.debug_struct("Tree").finish()
     }
+}
+
+macro_rules! children_of {
+    ($nodes: expr, $id: expr) => {{
+        let node = unsafe { $nodes.get_unchecked($id.value) };
+        let first_child_id = node.first_child;
+        let mut next_child_id = first_child_id;
+
+        let mut children = vec![];
+
+        while let Some(id) = next_child_id {
+            let node = unsafe { $nodes.get_unchecked(id.value) };
+            next_child_id = node.next_sibling;
+            children.push(id);
+        }
+
+        children
+    }};
 }
 
 impl<T> Tree<T> {
@@ -53,65 +72,283 @@ impl<T> Tree<T> {
 
     pub fn new(root: T) -> Self {
         Self {
-            nodes: vec![InnerNode::new(root)],
+            nodes: Cell::new(vec![InnerNode::new(root)]),
+            names: HashMap::new(),
         }
     }
 
-    pub fn nodes(&self) -> &[InnerNode<T>] {
-        &self.nodes
+    pub fn create_node(&self, data: T) -> NodeId {
+        let mut nodes = self.nodes.take();
+        let new_child_id = NodeId::new(nodes.len());
+
+        nodes.push(InnerNode::new(data));
+        self.nodes.set(nodes);
+        new_child_id
+    }
+
+    pub fn set_name(&mut self, id: NodeId, name: QualName) {
+        self.names.insert(id, name);
+    }
+
+    pub fn get_name(&self, id: &NodeId) -> &QualName {
+        self.names.get(id).unwrap()
     }
 
     pub fn get(&self, id: &NodeId) -> Option<NodeRef<T>> {
-        self.nodes.get(id.value).map(|node| NodeRef {
+        let nodes = self.nodes.take();
+        let node = nodes.get(id.value).map(|node| NodeRef {
             id: *id,
-            node,
             tree: self,
-        })
+        });
+
+        self.nodes.set(nodes);
+        node
     }
 
     pub fn get_unchecked(&self, id: &NodeId) -> NodeRef<T> {
         NodeRef {
             id: *id,
-            node: self.node(id),
             tree: self,
         }
-    }
-
-    pub fn get_mut(&mut self, id: &NodeId) -> Option<NodeRefMut<T>> {
-        let option = self.nodes.get_mut(id.value).map(|_| ());
-        option.map(move |_| NodeRefMut {
-            id: *id,
-            tree: self,
-        })
-    }
-
-    pub fn get_unchecked_mut(&mut self, id: &NodeId) -> NodeRefMut<T> {
-        NodeRefMut {
-            id: *id,
-            tree: self,
-        }
-    }
-
-    pub fn new_node(&mut self, data: T) -> NodeId {
-        let node_id = NodeId::new(self.nodes.len());
-        self.nodes.push(InnerNode::new(data));
-        node_id
-    }
-
-    pub fn node_mut(&mut self, id: &NodeId) -> &mut InnerNode<T> {
-        unsafe { self.nodes.get_unchecked_mut(id.value) }
-    }
-
-    pub fn node(&self, id: &NodeId) -> &InnerNode<T> {
-        unsafe { self.nodes.get_unchecked(id.value) }
-    }
-
-    pub fn root_mut(&mut self) -> NodeRefMut<T> {
-        self.get_unchecked_mut(&NodeId::new(0))
     }
 
     pub fn root(&self) -> NodeRef<T> {
         self.get_unchecked(&NodeId::new(0))
+    }
+
+    pub fn children_of(&self, id: &NodeId) -> Vec<NodeRef<T>> {
+        let nodes = self.nodes.take();
+        let children_ids = children_of!(&nodes, id);
+        self.nodes.set(nodes);
+
+        children_ids
+            .into_iter()
+            .map(|id| NodeRef::new(id, self))
+            .collect()
+    }
+
+    pub fn first_child_of(&self, id: &NodeId) -> Option<NodeRef<T>> {
+        let nodes = self.nodes.take();
+        let node = unsafe { nodes.get_unchecked(id.value) };
+        let target = node.first_child.map(|id| NodeRef { id, tree: self });
+
+        self.nodes.set(nodes);
+        target
+    }
+
+    pub fn last_child_of(&self, id: &NodeId) -> Option<NodeRef<T>> {
+        let nodes = self.nodes.take();
+        let node = unsafe { nodes.get_unchecked(id.value) };
+        let target = node.last_child.map(|id| NodeRef { id, tree: self });
+
+        self.nodes.set(nodes);
+        target
+    }
+
+    pub fn parent_of(&self, id: &NodeId) -> Option<NodeRef<T>> {
+        let nodes = self.nodes.take();
+        let node = unsafe { nodes.get_unchecked(id.value) };
+        let target = node.parent.map(|id| NodeRef { id, tree: self });
+
+        self.nodes.set(nodes);
+        target
+    }
+
+    pub fn prev_sibling_of(&self, id: &NodeId) -> Option<NodeRef<T>> {
+        let nodes = self.nodes.take();
+        let node = unsafe { nodes.get_unchecked(id.value) };
+        let target = node.prev_sibling.map(|id| NodeRef { id, tree: self });
+
+        self.nodes.set(nodes);
+        target
+    }
+
+    pub fn next_sibling_of(&self, id: &NodeId) -> Option<NodeRef<T>> {
+        let nodes = self.nodes.take();
+        let node = unsafe { nodes.get_unchecked(id.value) };
+        let target = node.next_sibling.map(|id| NodeRef { id, tree: self });
+
+        self.nodes.set(nodes);
+        target
+    }
+
+    pub fn append_child_data_of(&self, id: &NodeId, data: T) {
+        let mut nodes = self.nodes.take();
+        let mut last_child_id = None;
+
+        {
+            let parent = unsafe { nodes.get_unchecked(id.value) };
+            last_child_id = parent.last_child;
+        }
+
+        let new_child_id = NodeId::new(nodes.len());
+        let mut child = InnerNode::new(data);
+        child.prev_sibling = last_child_id;
+        child.parent = Some(*id);
+        nodes.push(child);
+
+        if let Some(id) = last_child_id {
+            let last_child = unsafe { nodes.get_unchecked_mut(id.value) };
+            last_child.next_sibling = Some(new_child_id);
+        }
+
+        let parent = unsafe { nodes.get_unchecked_mut(id.value) };
+        if parent.first_child.is_none() {
+            parent.first_child = Some(new_child_id);
+        }
+
+        parent.last_child = Some(new_child_id);
+
+        self.nodes.set(nodes);
+    }
+
+    pub fn append_child_of(&self, id: &NodeId, new_child_id: &NodeId) {
+        let mut nodes = self.nodes.take();
+        let mut last_child_id = None;
+        {
+            let parent = unsafe { nodes.get_unchecked_mut(id.value) };
+            last_child_id = parent.last_child;
+        }
+
+        if let Some(id) = last_child_id {
+            let last_child = unsafe { nodes.get_unchecked_mut(id.value) };
+            last_child.next_sibling = Some(*new_child_id);
+        }
+
+        let parent = unsafe { nodes.get_unchecked_mut(id.value) };
+        if last_child_id.is_none() {
+            parent.first_child = Some(*new_child_id);
+        }
+
+        parent.last_child = Some(*new_child_id);
+
+        let child = unsafe { nodes.get_unchecked_mut(new_child_id.value) };
+        child.prev_sibling = last_child_id;
+        child.parent = Some(*id);
+
+        self.nodes.set(nodes);
+    }
+
+    pub fn remove_from_parent(&self, id: &NodeId) {
+        let mut nodes = self.nodes.take();
+        let node = unsafe { nodes.get_unchecked_mut(id.value) };
+        let parent_id = node.parent;
+        let prev_sibling_id = node.prev_sibling;
+        let next_sibling_id = node.next_sibling;
+
+        node.parent = None;
+        node.next_sibling = None;
+        node.prev_sibling = None;
+
+        if let Some(parent_id) = parent_id {
+            let parent = unsafe { nodes.get_unchecked_mut(parent_id.value) };
+            if parent.first_child == Some(*id) {
+                parent.first_child = next_sibling_id;
+            }
+
+            if parent.last_child == Some(*id) {
+                parent.last_child = prev_sibling_id;
+            }
+        }
+
+        if let Some(prev_sibling_id) = prev_sibling_id {
+            let prev_sibling = unsafe { nodes.get_unchecked_mut(prev_sibling_id.value) };
+            prev_sibling.next_sibling = next_sibling_id;
+        }
+
+        if let Some(next_sibling_id) = next_sibling_id {
+            let next_sibling = unsafe { nodes.get_unchecked_mut(next_sibling_id.value) };
+            next_sibling.prev_sibling = prev_sibling_id;
+        }
+
+        self.nodes.set(nodes);
+    }
+
+    pub fn set_prev_sibling_of(&self, id: &NodeId, new_sibling_id: &NodeId) {
+        self.remove_from_parent(new_sibling_id);
+
+        let mut nodes = self.nodes.take();
+        let node = unsafe { nodes.get_unchecked_mut(id.value) };
+
+        let parent_id = node.parent;
+        let prev_sibling_id = node.prev_sibling;
+
+        node.prev_sibling = Some(*new_sibling_id);
+
+        let new_sibling = unsafe { nodes.get_unchecked_mut(new_sibling_id.value) };
+        new_sibling.parent = parent_id;
+        new_sibling.prev_sibling = prev_sibling_id;
+        new_sibling.next_sibling = Some(*id);
+
+        if let Some(parent_id) = parent_id {
+            let parent = unsafe { nodes.get_unchecked_mut(parent_id.value) };
+            if parent.first_child == Some(*id) {
+                parent.first_child = Some(*new_sibling_id);
+            }
+        }
+
+        if let Some(prev_sibling_id) = prev_sibling_id {
+            let prev_sibling = unsafe { nodes.get_unchecked_mut(prev_sibling_id.value) };
+            prev_sibling.next_sibling = Some(*new_sibling_id);
+        }
+
+        self.nodes.set(nodes);
+    }
+
+    pub fn reparent_children_of(&self, id: &NodeId, new_parent_id: &NodeId) {
+        let mut nodes = self.nodes.take();
+        let node = unsafe { nodes.get_unchecked_mut(id.value) };
+
+        let first_child_id = node.first_child;
+        let last_child_id = node.last_child;
+        node.first_child = None;
+        node.last_child = None;
+
+        let mut new_parent = unsafe { nodes.get_unchecked_mut(new_parent_id.value) };
+        new_parent.first_child = first_child_id;
+        new_parent.last_child = last_child_id;
+
+        let mut next_child_id = first_child_id;
+        while let Some(child_id) = next_child_id {
+            let child = unsafe { nodes.get_unchecked_mut(child_id.value) };
+            child.parent = Some(*new_parent_id);
+            next_child_id = child.next_sibling;
+        }
+
+        self.nodes.set(nodes);
+    }
+
+    pub fn query_node<F, B>(&self, id: &NodeId, f: F) -> B
+    where
+        F: FnOnce(&InnerNode<T>) -> B,
+    {
+        let nodes = self.nodes.take();
+        let r = f(unsafe { nodes.get_unchecked(id.value) });
+        self.nodes.set(nodes);
+        r
+    }
+
+    pub fn update_node<F, B>(&self, id: &NodeId, f: F) -> B
+    where
+        F: FnOnce(&mut InnerNode<T>) -> B,
+    {
+        let mut nodes = self.nodes.take();
+        let r = f(unsafe { nodes.get_unchecked_mut(id.value) });
+        self.nodes.set(nodes);
+        r
+    }
+
+    pub fn compare_node<F, B>(&self, a: &NodeId, b: &NodeId, f: F) -> B
+    where
+        F: FnOnce(&InnerNode<T>, &InnerNode<T>) -> B,
+    {
+        let nodes = self.nodes.take();
+        let node_a = unsafe { nodes.get_unchecked(a.value) };
+        let node_b = unsafe { nodes.get_unchecked(b.value) };
+
+        let r = f(node_a, node_b);
+        self.nodes.set(nodes);
+        r
     }
 }
 
@@ -137,29 +374,6 @@ impl<T> InnerNode<T> {
     }
 }
 
-impl InnerNode<NodeData> {
-    pub fn is_document(&self) -> bool {
-        match self.data {
-            NodeData::Document => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_element(&self) -> bool {
-        match self.data {
-            NodeData::Element(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_text(&self) -> bool {
-        match self.data {
-            NodeData::Text { .. } => true,
-            _ => false,
-        }
-    }
-}
-
 impl<T: Debug> Debug for InnerNode<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Node")
@@ -176,38 +390,58 @@ impl<T: Debug> Debug for InnerNode<T> {
 #[derive(Clone, Debug)]
 pub struct NodeRef<'a, T> {
     pub id: NodeId,
-    pub node: &'a InnerNode<T>,
     pub tree: &'a Tree<T>,
 }
 
 impl<'a, T> NodeRef<'a, T> {
-    pub fn new(id: usize, node: &'a InnerNode<T>, tree: &'a Tree<T>) -> Self {
-        Self {
-            id: NodeId::new(id),
-            node,
-            tree,
-        }
+    pub fn new(id: NodeId, tree: &'a Tree<T>) -> Self {
+        Self { id, tree }
     }
 
-    pub fn children(&self) -> Vec<NodeRef<'a, T>> {
-        let first_child_id = self.node.first_child;
-        let mut next_child_id = first_child_id;
-        let mut children = vec![];
-        while let Some(id) = next_child_id {
-            let node = self.tree.get_unchecked(&id);
-            next_child_id = node.node.next_sibling;
-            children.push(node);
-        }
-
-        children
-    }
-
-    pub fn first_child(&self) -> Option<NodeRef<T>> {
-        self.node.first_child.map(|id| self.tree.get_unchecked(&id))
+    pub fn inner_query<F, B>(&self, f: F) -> B
+    where
+        F: FnOnce(&InnerNode<T>) -> B,
+    {
+        self.tree.query_node(&self.id, f)
     }
 
     pub fn parent(&self) -> Option<Self> {
-        self.node.parent.map(|id| self.tree.get_unchecked(&id))
+        self.tree.parent_of(&self.id)
+    }
+
+    pub fn children(&self) -> Vec<Self> {
+        self.tree.children_of(&self.id)
+    }
+
+    pub fn first_child(&self) -> Option<Self> {
+        self.tree.first_child_of(&self.id)
+    }
+
+    pub fn remove_from_parent(&self) {
+        self.tree.remove_from_parent(&self.id)
+    }
+}
+
+impl<'a> NodeRef<'a, NodeData> {
+    pub fn is_document(&self) -> bool {
+        self.inner_query(|node| match node.data {
+            NodeData::Document => true,
+            _ => false,
+        })
+    }
+
+    pub fn is_element(&self) -> bool {
+        self.inner_query(|node| match node.data {
+            NodeData::Element(_) => true,
+            _ => false,
+        })
+    }
+
+    pub fn is_text(&self) -> bool {
+        self.inner_query(|node| match node.data {
+            NodeData::Text { .. } => true,
+            _ => false,
+        })
     }
 }
 
@@ -230,14 +464,15 @@ impl<'a> NodeRef<'a, NodeData> {
     }
 
     pub fn text(&self) -> StrTendril {
-        let mut ops = vec![self.clone()];
+        let mut ops = vec![self.id];
         let mut text = StrTendril::new();
+        let nodes = self.tree.nodes.take();
         while !ops.is_empty() {
-            let node_ref = ops.remove(0);
-            match node_ref.node.data {
+            let id = ops.remove(0);
+            let node = unsafe { nodes.get_unchecked(id.value) };
+            match node.data {
                 NodeData::Element(_) => {
-                    let children = node_ref.children();
-                    for child in children.into_iter().rev() {
+                    for child in children_of!(nodes, id).into_iter().rev() {
                         ops.insert(0, child);
                     }
                 }
@@ -248,154 +483,9 @@ impl<'a> NodeRef<'a, NodeData> {
             }
         }
 
+        self.tree.nodes.set(nodes);
+
         text
-    }
-}
-
-pub struct NodeRefMut<'a, T> {
-    pub id: NodeId,
-    pub tree: &'a mut Tree<T>,
-}
-
-impl<'a, T> NodeRefMut<'a, T> {
-    pub fn node(&mut self) -> &mut InnerNode<T> {
-        self.tree.node_mut(&self.id)
-    }
-
-    pub fn last_child(&mut self) -> Option<NodeRefMut<T>> {
-        self.node()
-            .last_child
-            .map(move |id| self.tree.get_unchecked_mut(&id))
-    }
-
-    pub fn first_child(&mut self) -> Option<NodeRefMut<T>> {
-        self.node()
-            .first_child
-            .map(move |id| self.tree.get_unchecked_mut(&id))
-    }
-
-    pub fn prev_sibling(&mut self) -> Option<NodeRefMut<T>> {
-        self.node()
-            .prev_sibling
-            .map(move |id| self.tree.get_unchecked_mut(&id))
-    }
-
-    pub fn next_sibling(&mut self) -> Option<NodeRefMut<T>> {
-        self.node()
-            .next_sibling
-            .map(move |id| self.tree.get_unchecked_mut(&id))
-    }
-
-    pub fn parent(&mut self) -> Option<NodeRefMut<T>> {
-        self.node()
-            .parent
-            .map(move |id| self.tree.get_unchecked_mut(&id))
-    }
-
-    pub fn append_with_data(&mut self, data: T) {
-        let new_child_id = self.tree.new_node(data);
-        self.append(&new_child_id)
-    }
-
-    pub fn append(&mut self, new_child_id: &NodeId) {
-        let id = self.id;
-        let last_child_id = self.node().last_child;
-
-        {
-            let mut new_child = self.tree.node_mut(new_child_id);
-            new_child.parent = Some(id);
-            new_child.prev_sibling = last_child_id;
-        }
-
-        if let Some(id) = last_child_id {
-            let mut last_child = self.tree.node_mut(&id);
-            last_child.next_sibling = Some(*new_child_id)
-        } else {
-            self.node().first_child = Some(*new_child_id);
-        }
-
-        self.node().last_child = Some(*new_child_id);
-    }
-
-    pub fn remove_from_parent(&mut self) {
-        let id = self.id;
-        let node = self.node();
-        let parent_id = node.parent;
-        let prev_sibling_id = node.prev_sibling;
-        let next_sibling_id = node.next_sibling;
-
-        node.parent = None;
-        node.next_sibling = None;
-        node.prev_sibling = None;
-
-        if let Some(parent_id) = parent_id {
-            let parent_node = self.tree.node_mut(&parent_id);
-            if parent_node.first_child == Some(id) {
-                parent_node.first_child = next_sibling_id;
-            }
-
-            if parent_node.last_child == Some(id) {
-                parent_node.last_child = prev_sibling_id;
-            }
-        }
-
-        if let Some(prev_sibling_id) = prev_sibling_id {
-            let prev_sibling_node = self.tree.node_mut(&prev_sibling_id);
-            prev_sibling_node.next_sibling = next_sibling_id;
-        }
-
-        if let Some(next_sibling_id) = next_sibling_id {
-            let next_sibling_node = self.tree.node_mut(&next_sibling_id);
-            next_sibling_node.prev_sibling = prev_sibling_id;
-        }
-    }
-
-    pub fn insert_prev_slibing(&mut self, sibling_id: &NodeId) {
-        let id = self.id;
-        let node = self.node();
-        let parent_id = node.parent;
-        let prev_sibling_id = node.prev_sibling;
-        node.prev_sibling = Some(*sibling_id);
-
-        let mut new_sibling = self.tree.get_unchecked_mut(sibling_id);
-        new_sibling.remove_from_parent();
-        let new_sibling_node = new_sibling.node();
-        new_sibling_node.prev_sibling = prev_sibling_id;
-        new_sibling_node.next_sibling = Some(id);
-
-        if let Some(parent_id) = parent_id {
-            let parent_node = self.tree.node_mut(&parent_id);
-            if parent_node.first_child == Some(id) {
-                parent_node.first_child = Some(*sibling_id);
-            }
-        }
-
-        if let Some(prev_sibling_id) = prev_sibling_id {
-            let prev_sibling_node = self.tree.node_mut(&prev_sibling_id);
-            prev_sibling_node.next_sibling = Some(*sibling_id);
-        }
-    }
-
-    pub fn reparent_children(&mut self, new_parent_id: &NodeId) {
-        let node = self.node();
-        let first_child_id = node.first_child;
-        let last_child_id = node.last_child;
-
-        node.first_child = None;
-        node.last_child = None;
-
-        {
-            let new_parent = self.tree.node_mut(new_parent_id);
-            new_parent.first_child = first_child_id;
-            new_parent.last_child = last_child_id;
-        }
-
-        let mut next_child_id = first_child_id;
-        while let Some(id) = next_child_id {
-            let node = self.tree.node_mut(&id);
-            node.parent = Some(*new_parent_id);
-            next_child_id = node.next_sibling;
-        }
     }
 }
 
@@ -464,8 +554,8 @@ impl Element {
     }
 }
 
-enum SerializeOp<'a> {
-    Open(NodeRef<'a, NodeData>),
+enum SerializeOp {
+    Open(NodeId),
     Close(QualName),
 }
 
@@ -482,20 +572,20 @@ impl<'a> Serialize for SerializableNodeRef<'a> {
     where
         S: Serializer,
     {
+        let nodes = self.0.tree.nodes.take();
+        let id = self.0.id;
         let mut ops = match traversal_scope {
-            IncludeNode => vec![SerializeOp::Open(self.0.clone())],
-            ChildrenOnly(_) => self
-                .0
-                .children()
+            IncludeNode => vec![SerializeOp::Open(id)],
+            ChildrenOnly(_) => children_of!(nodes, id)
                 .into_iter()
                 .map(|h| SerializeOp::Open(h))
                 .collect(),
         };
 
         while !ops.is_empty() {
-            match ops.remove(0) {
-                SerializeOp::Open(node_ref) => match &node_ref.node.data {
-                    &NodeData::Element(ref e) => {
+            if let Err(e) = match ops.remove(0) {
+                SerializeOp::Open(id) => match unsafe { &nodes.get_unchecked(id.value).data } {
+                    NodeData::Element(ref e) => {
                         serializer.start_elem(
                             e.name.clone(),
                             e.attrs.iter().map(|at| (&at.name, &at.value[..])),
@@ -503,31 +593,29 @@ impl<'a> Serialize for SerializableNodeRef<'a> {
 
                         ops.insert(0, SerializeOp::Close(e.name.clone()));
 
-                        for child in node_ref.children().into_iter().rev() {
-                            ops.insert(0, SerializeOp::Open(child));
+                        for child_id in children_of!(nodes, id).into_iter().rev() {
+                            ops.insert(0, SerializeOp::Open(child_id));
                         }
+
+                        Ok(())
                     }
-
-                    &NodeData::Doctype { ref name, .. } => serializer.write_doctype(&name)?,
-
-                    &NodeData::Text { ref contents } => serializer.write_text(&contents)?,
-
-                    &NodeData::Comment { ref contents } => serializer.write_comment(&contents)?,
-
-                    &NodeData::ProcessingInstruction {
+                    NodeData::Doctype { ref name, .. } => serializer.write_doctype(&name),
+                    NodeData::Text { ref contents } => serializer.write_text(&contents),
+                    NodeData::Comment { ref contents } => serializer.write_comment(&contents),
+                    NodeData::ProcessingInstruction {
                         ref target,
                         ref contents,
-                    } => serializer.write_processing_instruction(target, contents)?,
-
-                    &NodeData::Document => continue,
+                    } => serializer.write_processing_instruction(target, contents),
+                    NodeData::Document => continue,
                 },
-
-                SerializeOp::Close(name) => {
-                    serializer.end_elem(name)?;
-                }
+                SerializeOp::Close(name) => serializer.end_elem(name),
+            } {
+                self.0.tree.nodes.set(nodes);
+                return Err(e);
             }
         }
 
+        self.0.tree.nodes.set(nodes);
         Ok(())
     }
 }

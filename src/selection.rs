@@ -13,7 +13,7 @@ impl Document {
 
     pub fn find_with_matcher<'a, 'b>(&'a self, matcher: &'b Matcher) -> Selection<'a> {
         let root = self.tree.root();
-        let nodes = Matches::from_one(root, matcher.clone()).collect();
+        let nodes = matcher.clone().match_one(root).collect();
 
         Selection { nodes }
     }
@@ -53,6 +53,12 @@ impl<'a> Selection<'a> {
         }
 
         s
+    }
+
+    pub fn remove(&self) {
+        for node in &self.nodes {
+            node.remove_from_parent()
+        }
     }
 }
 
