@@ -188,15 +188,15 @@ impl TreeSink for Document {
                     return;
                 }
 
-                self.tree
-                    .append_child_data_of(sibling, NodeData::Text { contents: text })
+                let id = self.tree.create_node(NodeData::Text { contents: text });
+                self.tree.append_prev_sibling_of(sibling, &id);
             }
 
             // The tree builder promises we won't have a text node after
             // the insertion point.
 
             // Any other kind of node.
-            NodeOrText::AppendNode(node) => self.tree.append_child_of(sibling, &node),
+            NodeOrText::AppendNode(id) => self.tree.append_prev_sibling_of(sibling, &id),
         };
     }
 
@@ -264,7 +264,7 @@ impl TreeSink for Document {
 
     // Remove all the children from node and append them to new_parent.
     fn reparent_children(&mut self, node: &NodeId, new_parent: &NodeId) {
-        self.tree.reparent_children_of(node, new_parent);
+        self.tree.reparent_children_of(node, Some(*new_parent));
     }
 }
 

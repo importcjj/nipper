@@ -52,7 +52,7 @@ impl<'a> selectors::Element for Node<'a> {
     }
 
     fn has_local_name(&self, local_name: &<Self::Impl as SelectorImpl>::BorrowedLocalName) -> bool {
-        self.inner_query(|node| {
+        self.query(|node| {
             if let NodeData::Element(ref e) = node.data {
                 return &e.name.local == local_name;
             }
@@ -86,7 +86,7 @@ impl<'a> selectors::Element for Node<'a> {
         local_name: &<Self::Impl as SelectorImpl>::LocalName,
         operation: &AttrSelectorOperation<&<Self::Impl as SelectorImpl>::AttrValue>,
     ) -> bool {
-        self.inner_query(|node| {
+        self.query(|node| {
             if let NodeData::Element(ref e) = node.data {
                 return e.attrs.iter().any(|attr| match *ns {
                     NamespaceConstraint::Specific(url) if *url != attr.name.ns => false,
@@ -133,7 +133,7 @@ impl<'a> selectors::Element for Node<'a> {
         name: &<Self::Impl as SelectorImpl>::Identifier,
         case_sensitivity: CaseSensitivity,
     ) -> bool {
-        self.inner_query(|node| {
+        self.query(|node| {
             if let NodeData::Element(ref e) = node.data {
                 return e.attrs.iter().any(|attr| {
                     attr.name.local.deref() == "id"
@@ -150,7 +150,7 @@ impl<'a> selectors::Element for Node<'a> {
         name: &<Self::Impl as SelectorImpl>::ClassName,
         case_sensitivity: CaseSensitivity,
     ) -> bool {
-        self.inner_query(|node| {
+        self.query(|node| {
             if let NodeData::Element(ref e) = node.data {
                 return e
                     .attrs

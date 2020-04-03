@@ -1,17 +1,48 @@
 use html5ever::serialize;
 use html5ever::serialize::SerializeOpts;
+use html5ever::LocalName;
 use markup5ever::serialize::TraversalScope;
 use markup5ever::serialize::TraversalScope::{ChildrenOnly, IncludeNode};
 use markup5ever::serialize::{Serialize, Serializer};
 use markup5ever::Attribute;
 use markup5ever::QualName;
+use markup5ever::{namespace_url, ns};
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::io;
 use tendril::StrTendril;
-
 pub type Node<'a> = NodeRef<'a, NodeData>;
+
+macro_rules! get_node_unchecked {
+    ($nodes: expr, $id: expr) => {
+        unsafe { $nodes.get_unchecked($id) }
+    };
+}
+
+macro_rules! get_node_unchecked_mut {
+    ($nodes: expr, $id: expr) => {
+        unsafe { $nodes.get_unchecked_mut($id) }
+    };
+}
+
+macro_rules! with_cell {
+    ($cell: expr, $bind_value: ident, $some_work: block) => {{
+        let $bind_value = $cell.take();
+        let r = $some_work;
+        $cell.set($bind_value);
+        r
+    }};
+}
+
+macro_rules! with_cell_mut {
+    ($cell: expr, $bind_value: ident, $some_work: block) => {{
+        let mut $bind_value = $cell.take();
+        let r = $some_work;
+        $cell.set($bind_value);
+        r
+    }};
+}
 
 pub(crate) fn append_to_existing_text(prev: &mut InnerNode<NodeData>, text: &str) -> bool {
     match prev.data {
@@ -34,8 +65,6 @@ impl NodeId {
     }
 }
 
-impl NodeId {}
-
 pub struct Tree<T> {
     nodes: Cell<Vec<InnerNode<T>>>,
     names: HashMap<NodeId, QualName>,
@@ -44,6 +73,17 @@ pub struct Tree<T> {
 impl<T: Debug> Debug for Tree<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Tree").finish()
+    }
+}
+
+impl<T: Clone> Clone for Tree<T> {
+    fn clone(&self) -> Self {
+        with_cell!(self.nodes, nodes, {
+            Self {
+                nodes: Cell::new(nodes.clone()),
+                names: self.names.clone(),
+            }
+        })
     }
 }
 
@@ -65,14 +105,15 @@ macro_rules! children_of {
     }};
 }
 
-impl<T> Tree<T> {
+impl<T: Debug> Tree<T> {
     pub fn root_id(&self) -> NodeId {
         NodeId { value: 0 }
     }
 
     pub fn new(root: T) -> Self {
+        let root_id = NodeId::new(0);
         Self {
-            nodes: Cell::new(vec![InnerNode::new(root)]),
+            nodes: Cell::new(vec![InnerNode::new(root_id, root)]),
             names: HashMap::new(),
         }
     }
@@ -81,7 +122,7 @@ impl<T> Tree<T> {
         let mut nodes = self.nodes.take();
         let new_child_id = NodeId::new(nodes.len());
 
-        nodes.push(InnerNode::new(data));
+        nodes.push(InnerNode::new(new_child_id, data));
         self.nodes.set(nodes);
         new_child_id
     }
@@ -96,7 +137,7 @@ impl<T> Tree<T> {
 
     pub fn get(&self, id: &NodeId) -> Option<NodeRef<T>> {
         let nodes = self.nodes.take();
-        let node = nodes.get(id.value).map(|node| NodeRef {
+        let node = nodes.get(id.value).map(|_| NodeRef {
             id: *id,
             tree: self,
         });
@@ -117,205 +158,366 @@ impl<T> Tree<T> {
     }
 
     pub fn children_of(&self, id: &NodeId) -> Vec<NodeRef<T>> {
-        let nodes = self.nodes.take();
-        let children_ids = children_of!(&nodes, id);
-        self.nodes.set(nodes);
-
-        children_ids
-            .into_iter()
-            .map(|id| NodeRef::new(id, self))
-            .collect()
+        with_cell!(self.nodes, nodes, {
+            children_of!(&nodes, id)
+                .into_iter()
+                .map(|id| NodeRef::new(id, self))
+                .collect()
+        })
     }
 
     pub fn first_child_of(&self, id: &NodeId) -> Option<NodeRef<T>> {
-        let nodes = self.nodes.take();
-        let node = unsafe { nodes.get_unchecked(id.value) };
-        let target = node.first_child.map(|id| NodeRef { id, tree: self });
-
-        self.nodes.set(nodes);
-        target
+        with_cell!(self.nodes, nodes, {
+            let node = get_node_unchecked!(nodes, id.value);
+            node.first_child.map(|id| NodeRef { id, tree: self })
+        })
     }
 
     pub fn last_child_of(&self, id: &NodeId) -> Option<NodeRef<T>> {
-        let nodes = self.nodes.take();
-        let node = unsafe { nodes.get_unchecked(id.value) };
-        let target = node.last_child.map(|id| NodeRef { id, tree: self });
-
-        self.nodes.set(nodes);
-        target
+        with_cell!(self.nodes, nodes, {
+            let node = get_node_unchecked!(nodes, id.value);
+            node.last_child.map(|id| NodeRef { id, tree: self })
+        })
     }
 
     pub fn parent_of(&self, id: &NodeId) -> Option<NodeRef<T>> {
-        let nodes = self.nodes.take();
-        let node = unsafe { nodes.get_unchecked(id.value) };
-        let target = node.parent.map(|id| NodeRef { id, tree: self });
-
-        self.nodes.set(nodes);
-        target
+        with_cell!(self.nodes, nodes, {
+            let node = get_node_unchecked!(nodes, id.value);
+            node.parent.map(|id| NodeRef { id, tree: self })
+        })
     }
 
     pub fn prev_sibling_of(&self, id: &NodeId) -> Option<NodeRef<T>> {
-        let nodes = self.nodes.take();
-        let node = unsafe { nodes.get_unchecked(id.value) };
-        let target = node.prev_sibling.map(|id| NodeRef { id, tree: self });
-
-        self.nodes.set(nodes);
-        target
+        with_cell!(self.nodes, nodes, {
+            let node = get_node_unchecked!(nodes, id.value);
+            node.prev_sibling.map(|id| NodeRef { id, tree: self })
+        })
     }
 
     pub fn next_sibling_of(&self, id: &NodeId) -> Option<NodeRef<T>> {
-        let nodes = self.nodes.take();
-        let node = unsafe { nodes.get_unchecked(id.value) };
-        let target = node.next_sibling.map(|id| NodeRef { id, tree: self });
-
-        self.nodes.set(nodes);
-        target
+        with_cell!(self.nodes, nodes, {
+            let node = get_node_unchecked!(nodes, id.value);
+            node.next_sibling.map(|id| NodeRef { id, tree: self })
+        })
     }
 
     pub fn append_child_data_of(&self, id: &NodeId, data: T) {
-        let mut nodes = self.nodes.take();
-        let mut last_child_id = None;
+        with_cell_mut!(self.nodes, nodes, {
+            let mut last_child_id = None;
 
-        {
-            let parent = unsafe { nodes.get_unchecked(id.value) };
-            last_child_id = parent.last_child;
-        }
+            {
+                let parent = get_node_unchecked!(nodes, id.value);
+                last_child_id = parent.last_child;
+            }
 
-        let new_child_id = NodeId::new(nodes.len());
-        let mut child = InnerNode::new(data);
-        child.prev_sibling = last_child_id;
-        child.parent = Some(*id);
-        nodes.push(child);
+            let new_child_id = NodeId::new(nodes.len());
+            let mut child = InnerNode::new(new_child_id, data);
+            child.prev_sibling = last_child_id;
+            child.parent = Some(*id);
+            nodes.push(child);
 
-        if let Some(id) = last_child_id {
-            let last_child = unsafe { nodes.get_unchecked_mut(id.value) };
-            last_child.next_sibling = Some(new_child_id);
-        }
+            if let Some(id) = last_child_id {
+                let last_child = get_node_unchecked_mut!(nodes, id.value);
+                last_child.next_sibling = Some(new_child_id);
+            }
 
-        let parent = unsafe { nodes.get_unchecked_mut(id.value) };
-        if parent.first_child.is_none() {
-            parent.first_child = Some(new_child_id);
-        }
+            let parent = get_node_unchecked_mut!(nodes, id.value);
+            if parent.first_child.is_none() {
+                parent.first_child = Some(new_child_id);
+            }
 
-        parent.last_child = Some(new_child_id);
-
-        self.nodes.set(nodes);
+            parent.last_child = Some(new_child_id);
+        })
     }
 
     pub fn append_child_of(&self, id: &NodeId, new_child_id: &NodeId) {
-        let mut nodes = self.nodes.take();
-        let mut last_child_id = None;
-        {
-            let parent = unsafe { nodes.get_unchecked_mut(id.value) };
-            last_child_id = parent.last_child;
-        }
+        with_cell_mut!(self.nodes, nodes, {
+            let mut last_child_id = None;
+            {
+                let parent = get_node_unchecked_mut!(nodes, id.value);
+                last_child_id = parent.last_child;
+            }
 
-        if let Some(id) = last_child_id {
-            let last_child = unsafe { nodes.get_unchecked_mut(id.value) };
-            last_child.next_sibling = Some(*new_child_id);
-        }
+            if let Some(id) = last_child_id {
+                let last_child = get_node_unchecked_mut!(nodes, id.value);
+                last_child.next_sibling = Some(*new_child_id);
+            }
 
-        let parent = unsafe { nodes.get_unchecked_mut(id.value) };
-        if last_child_id.is_none() {
-            parent.first_child = Some(*new_child_id);
-        }
+            let parent = get_node_unchecked_mut!(nodes, id.value);
+            if last_child_id.is_none() {
+                parent.first_child = Some(*new_child_id);
+            }
 
-        parent.last_child = Some(*new_child_id);
+            parent.last_child = Some(*new_child_id);
 
-        let child = unsafe { nodes.get_unchecked_mut(new_child_id.value) };
-        child.prev_sibling = last_child_id;
-        child.parent = Some(*id);
+            let child = get_node_unchecked_mut!(nodes, new_child_id.value);
+            child.prev_sibling = last_child_id;
+            child.parent = Some(*id);
+        })
+    }
 
-        self.nodes.set(nodes);
+    pub fn append_children_from_another_tree(&self, id: &NodeId, tree: Tree<T>) {
+        with_cell_mut!(self.nodes, nodes, {
+            let mut new_nodes = tree.nodes.take();
+            assert!(
+                new_nodes.len() > 0,
+                "The tree should have at leaset one root node"
+            );
+            assert!(
+                nodes.len() > 0,
+                "The tree should have at leaset one root node"
+            );
+
+            let offset = nodes.len();
+
+            // `parse_fragment` returns a document that looks like:
+            // <:root>                     id -> 0
+            //  <body>                     id -> 1
+            //      <html>                 id -> 2
+            //          things we need.
+            //      </html>
+            //  </body>
+            // <:root>
+            const TRUE_ROOT_ID: usize = 2;
+            let root = get_node_unchecked!(new_nodes, TRUE_ROOT_ID as usize);
+
+            macro_rules! fix_id {
+                ($id: expr) => {
+                    $id.map(|old| NodeId::new(old.value + offset))
+                };
+            }
+
+            let first_child_id = fix_id!(root.first_child);
+            let last_child_id = fix_id!(root.last_child);
+
+            // Update new parent's first and last child id.
+            let mut parent = get_node_unchecked_mut!(nodes, id.value);
+            if parent.first_child.is_none() {
+                parent.first_child = first_child_id;
+            }
+
+            let parent_last_child_id = parent.last_child;
+            parent.last_child = last_child_id;
+
+            // Update next_sibling_id
+            if let Some(last_child_id) = parent_last_child_id {
+                let mut last_child = get_node_unchecked_mut!(nodes, last_child_id.value);
+                last_child.next_sibling = first_child_id;
+            }
+
+            let mut first_valid_child = false;
+
+            // Fix nodes's ref id.
+            for node in &mut new_nodes {
+                node.parent = node.parent.and_then(|parent_id| match parent_id.value {
+                    i if i < TRUE_ROOT_ID => None,
+                    i if i == TRUE_ROOT_ID => Some(*id),
+                    i @ _ => fix_id!(Some(NodeId::new(i))),
+                });
+
+                // Update prev_sibling_id
+                if !first_valid_child && node.parent == Some(*id) {
+                    first_valid_child = true;
+
+                    node.prev_sibling = parent_last_child_id;
+                }
+
+                node.id = fix_id!(node.id);
+                node.prev_sibling = fix_id!(node.prev_sibling);
+                node.next_sibling = fix_id!(node.next_sibling);
+                node.first_child = fix_id!(node.first_child);
+                node.last_child = fix_id!(node.last_child);
+            }
+
+            // Put all the new nodes except the root node into the nodes.
+            nodes.extend(new_nodes);
+        })
+    }
+
+    pub fn append_prev_siblings_from_another_tree(&self, id: &NodeId, tree: Tree<T>) {
+        with_cell_mut!(self.nodes, nodes, {
+            let mut new_nodes = tree.nodes.take();
+            assert!(
+                new_nodes.len() > 0,
+                "The tree should have at leaset one root node"
+            );
+            assert!(
+                nodes.len() > 0,
+                "The tree should have at leaset one root node"
+            );
+
+            let offset = nodes.len();
+            // `parse_fragment` returns a document that looks like:
+            // <:root>                     id -> 0
+            //  <body>                     id -> 1
+            //      <html>                 id -> 2
+            //          things we need.
+            //      </html>
+            //  </body>
+            // <:root>
+            const TRUE_ROOT_ID: usize = 2;
+            let root = get_node_unchecked!(new_nodes, TRUE_ROOT_ID as usize);
+            macro_rules! fix_id {
+                ($id: expr) => {
+                    $id.map(|old| NodeId::new(old.value + offset))
+                };
+            }
+
+            let first_child_id = fix_id!(root.first_child);
+            let last_child_id = fix_id!(root.last_child);
+
+            let mut node = get_node_unchecked_mut!(nodes, id.value);
+            let prev_sibling_id = node.prev_sibling;
+            let parent_id = node.parent;
+
+            // Update previous sibling id.
+            node.prev_sibling = last_child_id;
+
+            // Update parent's first child.
+            if prev_sibling_id.is_none() {
+                if let Some(parent_id) = parent_id {
+                    let mut parent = get_node_unchecked_mut!(nodes, parent_id.value);
+                    parent.first_child = first_child_id;
+                }
+            }
+
+            let mut i = 0;
+            let mut last_valid_child = 0;
+            // Fix nodes's ref id.
+            for node in &mut new_nodes {
+                node.parent = node
+                    .parent
+                    .and_then(|old_parent_id| match old_parent_id.value {
+                        i if i < TRUE_ROOT_ID => None,
+                        i if i == TRUE_ROOT_ID => parent_id,
+                        i @ _ => fix_id!(Some(NodeId::new(i))),
+                    });
+
+                if node.parent == parent_id {
+                    last_valid_child = i;
+                }
+
+                node.id = fix_id!(node.id);
+                node.first_child = fix_id!(node.first_child);
+                node.last_child = fix_id!(node.last_child);
+                node.prev_sibling = fix_id!(node.prev_sibling);
+                node.next_sibling = fix_id!(node.next_sibling);
+                i += 1;
+            }
+
+            println!("new parent id {:?}", parent_id);
+            for node in &new_nodes {
+                println!("{:?}", node);
+            }
+
+            // Update next sibling id.
+            new_nodes[last_valid_child as usize].next_sibling = Some(*id);
+
+            // Put all the new nodes except the root node into the nodes.
+            nodes.extend(new_nodes);
+        })
     }
 
     pub fn remove_from_parent(&self, id: &NodeId) {
-        let mut nodes = self.nodes.take();
-        let node = unsafe { nodes.get_unchecked_mut(id.value) };
-        let parent_id = node.parent;
-        let prev_sibling_id = node.prev_sibling;
-        let next_sibling_id = node.next_sibling;
+        with_cell_mut!(self.nodes, nodes, {
+            let node = get_node_unchecked_mut!(nodes, id.value);
+            let parent_id = node.parent;
+            let prev_sibling_id = node.prev_sibling;
+            let next_sibling_id = node.next_sibling;
 
-        node.parent = None;
-        node.next_sibling = None;
-        node.prev_sibling = None;
+            node.parent = None;
+            node.next_sibling = None;
+            node.prev_sibling = None;
 
-        if let Some(parent_id) = parent_id {
-            let parent = unsafe { nodes.get_unchecked_mut(parent_id.value) };
-            if parent.first_child == Some(*id) {
-                parent.first_child = next_sibling_id;
+            if let Some(parent_id) = parent_id {
+                let parent = get_node_unchecked_mut!(nodes, parent_id.value);
+                if parent.first_child == Some(*id) {
+                    parent.first_child = next_sibling_id;
+                }
+
+                if parent.last_child == Some(*id) {
+                    parent.last_child = prev_sibling_id;
+                }
             }
 
-            if parent.last_child == Some(*id) {
-                parent.last_child = prev_sibling_id;
+            if let Some(prev_sibling_id) = prev_sibling_id {
+                let prev_sibling = get_node_unchecked_mut!(nodes, prev_sibling_id.value);
+                prev_sibling.next_sibling = next_sibling_id;
             }
-        }
 
-        if let Some(prev_sibling_id) = prev_sibling_id {
-            let prev_sibling = unsafe { nodes.get_unchecked_mut(prev_sibling_id.value) };
-            prev_sibling.next_sibling = next_sibling_id;
-        }
-
-        if let Some(next_sibling_id) = next_sibling_id {
-            let next_sibling = unsafe { nodes.get_unchecked_mut(next_sibling_id.value) };
-            next_sibling.prev_sibling = prev_sibling_id;
-        }
-
-        self.nodes.set(nodes);
+            if let Some(next_sibling_id) = next_sibling_id {
+                let next_sibling = get_node_unchecked_mut!(nodes, next_sibling_id.value);
+                next_sibling.prev_sibling = prev_sibling_id;
+            }
+        })
     }
 
-    pub fn set_prev_sibling_of(&self, id: &NodeId, new_sibling_id: &NodeId) {
+    pub fn append_prev_sibling_of(&self, id: &NodeId, new_sibling_id: &NodeId) {
         self.remove_from_parent(new_sibling_id);
 
-        let mut nodes = self.nodes.take();
-        let node = unsafe { nodes.get_unchecked_mut(id.value) };
+        with_cell_mut!(self.nodes, nodes, {
+            let node = get_node_unchecked_mut!(nodes, id.value);
 
-        let parent_id = node.parent;
-        let prev_sibling_id = node.prev_sibling;
+            let parent_id = node.parent;
+            let prev_sibling_id = node.prev_sibling;
 
-        node.prev_sibling = Some(*new_sibling_id);
+            node.prev_sibling = Some(*new_sibling_id);
 
-        let new_sibling = unsafe { nodes.get_unchecked_mut(new_sibling_id.value) };
-        new_sibling.parent = parent_id;
-        new_sibling.prev_sibling = prev_sibling_id;
-        new_sibling.next_sibling = Some(*id);
+            let new_sibling = get_node_unchecked_mut!(nodes, new_sibling_id.value);
+            new_sibling.parent = parent_id;
+            new_sibling.prev_sibling = prev_sibling_id;
+            new_sibling.next_sibling = Some(*id);
 
-        if let Some(parent_id) = parent_id {
-            let parent = unsafe { nodes.get_unchecked_mut(parent_id.value) };
-            if parent.first_child == Some(*id) {
-                parent.first_child = Some(*new_sibling_id);
+            if let Some(parent_id) = parent_id {
+                let parent = get_node_unchecked_mut!(nodes, parent_id.value);
+                if parent.first_child == Some(*id) {
+                    parent.first_child = Some(*new_sibling_id);
+                }
             }
-        }
 
-        if let Some(prev_sibling_id) = prev_sibling_id {
-            let prev_sibling = unsafe { nodes.get_unchecked_mut(prev_sibling_id.value) };
-            prev_sibling.next_sibling = Some(*new_sibling_id);
-        }
-
-        self.nodes.set(nodes);
+            if let Some(prev_sibling_id) = prev_sibling_id {
+                let prev_sibling = get_node_unchecked_mut!(nodes, prev_sibling_id.value);
+                prev_sibling.next_sibling = Some(*new_sibling_id);
+            }
+        })
     }
 
-    pub fn reparent_children_of(&self, id: &NodeId, new_parent_id: &NodeId) {
-        let mut nodes = self.nodes.take();
-        let node = unsafe { nodes.get_unchecked_mut(id.value) };
+    pub fn reparent_children_of(&self, id: &NodeId, new_parent_id: Option<NodeId>) {
+        with_cell_mut!(self.nodes, nodes, {
+            let node = get_node_unchecked_mut!(nodes, id.value);
 
-        let first_child_id = node.first_child;
-        let last_child_id = node.last_child;
-        node.first_child = None;
-        node.last_child = None;
+            let first_child_id = node.first_child;
+            let last_child_id = node.last_child;
+            node.first_child = None;
+            node.last_child = None;
 
-        let mut new_parent = unsafe { nodes.get_unchecked_mut(new_parent_id.value) };
-        new_parent.first_child = first_child_id;
-        new_parent.last_child = last_child_id;
+            if let Some(new_parent_id) = new_parent_id {
+                let mut new_parent = get_node_unchecked_mut!(nodes, new_parent_id.value);
+                new_parent.first_child = first_child_id;
+                new_parent.last_child = last_child_id;
+            }
+            let mut next_child_id = first_child_id;
+            while let Some(child_id) = next_child_id {
+                let child = get_node_unchecked_mut!(nodes, child_id.value);
+                child.parent = new_parent_id;
+                next_child_id = child.next_sibling;
+            }
+        })
+    }
 
-        let mut next_child_id = first_child_id;
-        while let Some(child_id) = next_child_id {
-            let child = unsafe { nodes.get_unchecked_mut(child_id.value) };
-            child.parent = Some(*new_parent_id);
-            next_child_id = child.next_sibling;
-        }
+    pub fn debug_nodes(&self) {
+        with_cell!(self.nodes, nodes, {
+            println!("==============");
+            for node in &nodes {
+                println!("{:?}", node);
+            }
 
-        self.nodes.set(nodes);
+            println!("==============");
+        })
+    }
+
+    pub fn remove_children_of(&self, id: &NodeId) {
+        self.reparent_children_of(id, None)
     }
 
     pub fn query_node<F, B>(&self, id: &NodeId, f: F) -> B
@@ -353,6 +555,7 @@ impl<T> Tree<T> {
 }
 
 pub struct InnerNode<T> {
+    pub id: Option<NodeId>,
     pub parent: Option<NodeId>,
     pub prev_sibling: Option<NodeId>,
     pub next_sibling: Option<NodeId>,
@@ -362,8 +565,9 @@ pub struct InnerNode<T> {
 }
 
 impl<T> InnerNode<T> {
-    fn new(data: T) -> Self {
+    fn new(id: NodeId, data: T) -> Self {
         InnerNode {
+            id: Some(id),
             parent: None,
             prev_sibling: None,
             next_sibling: None,
@@ -377,6 +581,7 @@ impl<T> InnerNode<T> {
 impl<T: Debug> Debug for InnerNode<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Node")
+            .field("id", &self.id)
             .field("parnet", &self.parent)
             .field("prev_sibling", &self.prev_sibling)
             .field("next_sibling", &self.next_sibling)
@@ -387,22 +592,43 @@ impl<T: Debug> Debug for InnerNode<T> {
     }
 }
 
+impl<T: Clone> Clone for InnerNode<T> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            parent: self.parent.clone(),
+            prev_sibling: self.prev_sibling.clone(),
+            next_sibling: self.next_sibling.clone(),
+            first_child: self.first_child.clone(),
+            last_child: self.last_child.clone(),
+            data: self.data.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct NodeRef<'a, T> {
     pub id: NodeId,
     pub tree: &'a Tree<T>,
 }
 
-impl<'a, T> NodeRef<'a, T> {
+impl<'a, T: Debug> NodeRef<'a, T> {
     pub fn new(id: NodeId, tree: &'a Tree<T>) -> Self {
         Self { id, tree }
     }
 
-    pub fn inner_query<F, B>(&self, f: F) -> B
+    pub fn query<F, B>(&self, f: F) -> B
     where
         F: FnOnce(&InnerNode<T>) -> B,
     {
         self.tree.query_node(&self.id, f)
+    }
+
+    pub fn update<F, B>(&self, f: F) -> B
+    where
+        F: FnOnce(&mut InnerNode<T>) -> B,
+    {
+        self.tree.update_node(&self.id, f)
     }
 
     pub fn parent(&self) -> Option<Self> {
@@ -420,32 +646,89 @@ impl<'a, T> NodeRef<'a, T> {
     pub fn remove_from_parent(&self) {
         self.tree.remove_from_parent(&self.id)
     }
+
+    pub fn remove_children(&self) {
+        self.tree.remove_children_of(&self.id)
+    }
+
+    pub fn append_children_from_another_tree(&self, tree: Tree<T>) {
+        self.tree.append_children_from_another_tree(&self.id, tree)
+    }
+
+    pub fn append_prev_siblings_from_another_tree(&self, tree: Tree<T>) {
+        self.tree
+            .append_prev_siblings_from_another_tree(&self.id, tree)
+    }
 }
 
-impl<'a> NodeRef<'a, NodeData> {
+impl<'a> Node<'a> {
+    pub fn attr(&self, name: &str) -> Option<StrTendril> {
+        self.query(|node| match node.data {
+            NodeData::Element(ref e) => e
+                .attrs
+                .iter()
+                .find(|attr| &attr.name.local == name)
+                .map(|attr| attr.value.clone()),
+            _ => None,
+        })
+    }
+
+    pub fn set_attr(&self, name: &str, val: &str) {
+        self.update(|node| {
+            if let NodeData::Element(ref mut e) = node.data {
+                let updated = e.attrs.iter_mut().any(|attr| {
+                    if &attr.name.local == name {
+                        attr.value = StrTendril::from(val);
+                        true
+                    } else {
+                        false
+                    }
+                });
+
+                if !updated {
+                    let value = StrTendril::from(val);
+                    // The namespace on the attribute name is almost always ns!().
+                    let name = QualName::new(None, ns!(), LocalName::from(name));
+
+                    e.attrs.push(Attribute { name, value })
+                }
+            }
+        })
+    }
+
+    pub fn remove_attr(&self, name: &str) {
+        self.update(|node| {
+            if let NodeData::Element(ref mut e) = node.data {
+                e.attrs.retain(|attr| &attr.name.local != name);
+            }
+        })
+    }
+}
+
+impl<'a> Node<'a> {
     pub fn is_document(&self) -> bool {
-        self.inner_query(|node| match node.data {
+        self.query(|node| match node.data {
             NodeData::Document => true,
             _ => false,
         })
     }
 
     pub fn is_element(&self) -> bool {
-        self.inner_query(|node| match node.data {
+        self.query(|node| match node.data {
             NodeData::Element(_) => true,
             _ => false,
         })
     }
 
     pub fn is_text(&self) -> bool {
-        self.inner_query(|node| match node.data {
+        self.query(|node| match node.data {
             NodeData::Text { .. } => true,
             _ => false,
         })
     }
 }
 
-impl<'a> NodeRef<'a, NodeData> {
+impl<'a> Node<'a> {
     pub fn html(&self) -> StrTendril {
         let inner: SerializableNodeRef = self.clone().into();
 

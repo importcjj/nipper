@@ -1,6 +1,5 @@
 use crate::document::Node;
 use crate::matcher::Matcher;
-use crate::matcher::Matches;
 use crate::Document;
 use std::vec::IntoIter;
 use tendril::StrTendril;
@@ -17,10 +16,17 @@ impl Document {
 
         Selection { nodes }
     }
+
+    pub fn html(&self) -> StrTendril {
+        match self.tree.root().first_child() {
+            Some(child) => child.html(),
+            _ => StrTendril::new(),
+        }
+    }
 }
 #[derive(Debug)]
 pub struct Selection<'a> {
-    nodes: Vec<Node<'a>>,
+    pub(crate) nodes: Vec<Node<'a>>,
 }
 
 impl<'a> Selection<'a> {
@@ -35,24 +41,8 @@ impl<'a> Selection<'a> {
         Selections::new(self.nodes.clone().into_iter())
     }
 
-    pub fn html(&self) -> StrTendril {
-        let mut s = StrTendril::new();
-
-        for node in &self.nodes {
-            s.push_tendril(&node.html());
-        }
-
-        s
-    }
-
-    pub fn text(&self) -> StrTendril {
-        let mut s = StrTendril::new();
-
-        for node in &self.nodes {
-            s.push_tendril(&node.text());
-        }
-
-        s
+    pub fn nodes(&self) -> &[Node<'a>] {
+        &self.nodes
     }
 
     pub fn remove(&self) {
