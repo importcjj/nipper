@@ -5,7 +5,7 @@ use std::vec::IntoIter;
 use tendril::StrTendril;
 
 impl Document {
-    pub fn find(&self, sel: &str) -> Selection {
+    pub fn select(&self, sel: &str) -> Selection {
         let matcher = Matcher::new(sel).unwrap();
         self.find_with_matcher(&matcher)
     }
@@ -30,7 +30,7 @@ pub struct Selection<'a> {
 }
 
 impl<'a> Selection<'a> {
-    pub fn find(&self, sel: &str) -> Selection<'a> {
+    pub fn select(&self, sel: &str) -> Selection<'a> {
         let matcher = Matcher::new(sel).unwrap();
         let nodes = matcher.match_all(self.nodes.clone().into_iter()).collect();
 

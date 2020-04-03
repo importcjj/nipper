@@ -10,14 +10,14 @@ impl<'a> Selection<'a> {
     }
 
     /// sets the given attribute to each element in the set of matched elements.
-    pub fn set_attr(&self, name: &str, val: &str) {
+    pub fn set_attr(&mut self, name: &str, val: &str) {
         for node in self.nodes() {
             node.set_attr(name, val);
         }
     }
 
     /// remove_attr removes the named attribute from each element in the set of matched elements.
-    pub fn remove_attr(&self, name: &str) {
+    pub fn remove_attr(&mut self, name: &str) {
         for node in self.nodes() {
             node.remove_attr(name);
         }

@@ -11,7 +11,7 @@ fn main() {
 
     let document = Document::from_str(html);
 
-    let items = document.find("ul").find("li");
+    let items = document.select("ul").select("li");
 
     for item in items.iter() {
         println!("{}", item.html());

@@ -5,7 +5,7 @@ fn main() {
     let document = Document::from_str(html);
     println!("{}", document.html());
 
-    let input = document.find(r#"div[name="foo"]"#);
+    let mut input = document.select(r#"div[name="foo"]"#);
     println!("{}", input.html());
     input.set_attr("id", "input");
     input.remove_attr("name");

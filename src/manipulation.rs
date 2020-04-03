@@ -34,7 +34,7 @@ macro_rules! parse_html {
 
 impl<'a> Selection<'a> {
     /// set the html contents of each element in the selection to specified parsed HTML.
-    pub fn set_html<T>(&self, html: T)
+    pub fn set_html<T>(&mut self, html: T)
     where
         T: Into<StrTendril>,
     {
@@ -50,7 +50,7 @@ impl<'a> Selection<'a> {
     /// It returns the removed elements.
     ///
     /// This follows the same rules as `append`.
-    pub fn replace_with_html<T>(&self, html: T)
+    pub fn replace_with_html<T>(&mut self, html: T)
     where
         T: Into<StrTendril>,
     {
@@ -73,7 +73,7 @@ impl<'a> Selection<'a> {
     }
 
     /// append_thml parses the html and appends it to the set of matched elements.
-    pub fn append_html<T>(&self, html: T)
+    pub fn append_html<T>(&mut self, html: T)
     where
         T: Into<StrTendril>,
     {

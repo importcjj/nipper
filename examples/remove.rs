@@ -11,11 +11,11 @@ fn main() {
 
     let document = Document::from_str(html);
 
-    let items = document.find("ul").find("li");
+    let items = document.select("ul").select("li");
 
     for item in items.iter() {
         item.remove()
     }
 
-    println!("{}", document.find("ul").html());
+    println!("{}", document.select("ul").html());
 }
