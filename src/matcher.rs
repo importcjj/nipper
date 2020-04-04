@@ -35,7 +35,7 @@ impl Matcher {
         matching::matches_selector(&self.selector, 0, None, element, &mut ctx, &mut |_, _| {})
     }
 
-    pub(crate) fn match_all<E, I>(self, elements: I) -> Matches<E>
+    pub(crate) fn filter<E, I>(self, elements: I) -> Matches<E>
     where
         E: Element<Impl = InnerSelector>,
         I: Iterator<Item = E>,

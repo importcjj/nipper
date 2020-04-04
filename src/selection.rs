@@ -1,6 +1,7 @@
 use crate::document::Node;
 use crate::matcher::Matcher;
 use crate::Document;
+use std::slice::SliceIndex;
 use std::vec::IntoIter;
 use tendril::StrTendril;
 
@@ -32,7 +33,7 @@ pub struct Selection<'a> {
 impl<'a> Selection<'a> {
     pub fn select(&self, sel: &str) -> Selection<'a> {
         let matcher = Matcher::new(sel).unwrap();
-        let nodes = matcher.match_all(self.nodes.clone().into_iter()).collect();
+        let nodes = matcher.filter(self.nodes.clone().into_iter()).collect();
 
         Selection { nodes }
     }
@@ -49,6 +50,10 @@ impl<'a> Selection<'a> {
         for node in &self.nodes {
             node.remove_from_parent()
         }
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Node<'a>> {
+        self.nodes.get(index)
     }
 }
 

@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     let document = Document::from_str(&html);
-    
+
     for article in document.select(".article-list .item").iter() {
         let title = article.select(".title");
         let summary = article.select(".summary");
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("summary => {}", summary.text());
         println!("href => {}", article.attr("href").unwrap());
     }
-    
+
     println!("{:?}", start.elapsed());
     Ok(())
 }

@@ -12,8 +12,12 @@ fn main() {
     let document = Document::from_str(html);
 
     let items = document.select("ul").select("li");
+    let ul = items.parent();
 
-    for item in items.iter() {
+    println!("{}", ul.html());
+
+    for item in items.next().iter() {
+        println!("----");
         item.remove()
     }
 

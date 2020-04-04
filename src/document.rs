@@ -643,6 +643,10 @@ impl<'a, T: Debug> NodeRef<'a, T> {
         self.tree.first_child_of(&self.id)
     }
 
+    pub fn next_sibling(&self) -> Option<Self> {
+        self.tree.next_sibling_of(&self.id)
+    }
+
     pub fn remove_from_parent(&self) {
         self.tree.remove_from_parent(&self.id)
     }
@@ -662,6 +666,16 @@ impl<'a, T: Debug> NodeRef<'a, T> {
 }
 
 impl<'a> Node<'a> {
+    pub fn node_name(&self) -> Option<StrTendril> {
+        self.query(|node| match node.data {
+            NodeData::Element(ref e) => {
+                let name: &str = &e.name.local;
+                Some(StrTendril::from(name))
+            }
+            _ => None,
+        })
+    }
+
     pub fn attr(&self, name: &str) -> Option<StrTendril> {
         self.query(|node| match node.data {
             NodeData::Element(ref e) => e
