@@ -45,7 +45,7 @@ impl<'a> Selection<'a> {
         let mut set = HashSet::with_capacity(self.length());
 
         for node in self.nodes() {
-            for sibling in node.next_sibling() {
+            if let Some(sibling) = node.next_element_sibling() {
                 if !set.contains(&sibling.id) {
                     set.insert(sibling.id);
                     result.push(sibling);

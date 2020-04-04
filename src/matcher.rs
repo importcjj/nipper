@@ -34,25 +34,11 @@ impl Matcher {
 
         matching::matches_selector(&self.selector, 0, None, element, &mut ctx, &mut |_, _| {})
     }
-
-    pub(crate) fn filter<E, I>(self, elements: I) -> Matches<E>
-    where
-        E: Element<Impl = InnerSelector>,
-        I: Iterator<Item = E>,
-    {
-        Matches::from_list(elements, self)
-    }
-
-    pub(crate) fn match_one<E>(self, element: E) -> Matches<E>
-    where
-        E: Element<Impl = InnerSelector>,
-    {
-        Matches::from_one(element, self)
-    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Matches<T> {
+    roots: Vec<T>,
     nodes: Vec<T>,
     matcher: Matcher,
     set: HashSet<NodeId>,
@@ -61,7 +47,8 @@ pub struct Matches<T> {
 impl<T> Matches<T> {
     pub fn from_one(node: T, matcher: Matcher) -> Self {
         Self {
-            nodes: vec![node],
+            roots: vec![node],
+            nodes: vec![],
             matcher: matcher,
             set: HashSet::new(),
         }
@@ -69,7 +56,8 @@ impl<T> Matches<T> {
 
     pub fn from_list<I: Iterator<Item = T>>(nodes: I, matcher: Matcher) -> Self {
         Self {
-            nodes: nodes.collect(),
+            roots: nodes.collect(),
+            nodes: vec![],
             matcher: matcher,
             set: HashSet::new(),
         }
@@ -80,24 +68,35 @@ impl<'a> Iterator for Matches<NodeRef<'a, NodeData>> {
     type Item = NodeRef<'a, NodeData>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while !self.nodes.is_empty() {
-            let node = self.nodes.remove(0);
-
-            for node in node.children().into_iter().rev() {
-                self.nodes.insert(0, node);
-            }
-
-            if self.matcher.match_element(&node) {
-                if self.set.contains(&node.id) {
-                    continue;
+        loop {
+            if self.nodes.is_empty() {
+                if self.roots.is_empty() {
+                    return None;
                 }
 
-                self.set.insert(node.id);
-                return Some(node);
+                let root = self.roots.remove(0);
+                for child in root.children().into_iter().rev() {
+                    self.nodes.insert(0, child);
+                }
+            }
+
+            while !self.nodes.is_empty() {
+                let node = self.nodes.remove(0);
+
+                for node in node.children().into_iter().rev() {
+                    self.nodes.insert(0, node);
+                }
+
+                if self.matcher.match_element(&node) {
+                    if self.set.contains(&node.id) {
+                        continue;
+                    }
+
+                    self.set.insert(node.id);
+                    return Some(node);
+                }
             }
         }
-
-        None
     }
 }
 

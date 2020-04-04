@@ -7,8 +7,9 @@ impl<'a> Selection<'a> {
     /// returns true if at least one of these elements matches.
     pub fn is(&self, sel: &str) -> bool {
         if self.length() > 0 {
-            let matcher = Matcher::new(sel).unwrap();
-            return self.is_matcher(&matcher);
+            return Matcher::new(sel)
+                .map(|matcher| self.is_matcher(&matcher))
+                .unwrap_or(false);
         }
 
         false
@@ -18,8 +19,12 @@ impl<'a> Selection<'a> {
     /// returns true if at least one of these elements matches.
     pub fn is_matcher(&self, matcher: &Matcher) -> bool {
         if self.length() > 0 {
-            let elements = self.nodes.clone().into_iter();
-            return matcher.clone().filter(elements).count() > 0;
+            return self
+                .nodes()
+                .into_iter()
+                .filter(|node| matcher.match_element(*node))
+                .count()
+                > 0;
         }
 
         false

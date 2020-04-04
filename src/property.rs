@@ -34,8 +34,8 @@ impl<'a> Selection<'a> {
     }
 
     /// attor_or works like `attr` but returns default value if attribute is not present.
-    pub fn attr_or(&self, name: &str, default: &str) -> Option<StrTendril> {
-        self.attr(name).or_else(|| Some(StrTendril::from(default)))
+    pub fn attr_or(&self, name: &str, default: &str) -> StrTendril {
+        self.attr(name).unwrap_or_else(|| StrTendril::from(default))
     }
 
     /// html gets the HTML contents of the first element in the set of matched

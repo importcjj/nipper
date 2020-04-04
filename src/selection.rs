@@ -1,19 +1,20 @@
 use crate::document::Node;
-use crate::matcher::Matcher;
+use crate::matcher::{Matcher, Matches};
 use crate::Document;
-use std::slice::SliceIndex;
 use std::vec::IntoIter;
 use tendril::StrTendril;
 
 impl Document {
     pub fn select(&self, sel: &str) -> Selection {
-        let matcher = Matcher::new(sel).unwrap();
-        self.find_with_matcher(&matcher)
+        match Matcher::new(sel) {
+            Ok(matcher) => self.find_with_matcher(&matcher),
+            Err(_) => Default::default(),
+        }
     }
 
     pub fn find_with_matcher<'a, 'b>(&'a self, matcher: &'b Matcher) -> Selection<'a> {
         let root = self.tree.root();
-        let nodes = matcher.clone().match_one(root).collect();
+        let nodes = Matches::from_one(root, matcher.clone()).collect();
 
         Selection { nodes }
     }
@@ -30,12 +31,20 @@ pub struct Selection<'a> {
     pub(crate) nodes: Vec<Node<'a>>,
 }
 
+impl<'a> Default for Selection<'a> {
+    fn default() -> Self {
+        Self { nodes: vec![] }
+    }
+}
+
 impl<'a> Selection<'a> {
     pub fn select(&self, sel: &str) -> Selection<'a> {
-        let matcher = Matcher::new(sel).unwrap();
-        let nodes = matcher.filter(self.nodes.clone().into_iter()).collect();
-
-        Selection { nodes }
+        match Matcher::new(sel) {
+            Ok(matcher) => Selection {
+                nodes: Matches::from_list(self.nodes.clone().into_iter(), matcher).collect(),
+            },
+            Err(_) => Default::default(),
+        }
     }
 
     pub fn iter(&self) -> Selections<Node<'a>> {
