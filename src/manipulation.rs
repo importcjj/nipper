@@ -55,12 +55,10 @@ impl<'a> Selection<'a> {
         T: Into<StrTendril>,
     {
         let dom = parse_html!(html);
-
-        let lasti = self.size() - 1;
         let mut i = 0;
 
         for node in self.nodes() {
-            if i == lasti {
+            if i + 1 == self.size() {
                 node.append_prev_siblings_from_another_tree(dom.tree);
                 break;
             } else {
@@ -72,17 +70,30 @@ impl<'a> Selection<'a> {
         self.remove()
     }
 
+    /// replace_with_selection replaces each element in the set of matched element with
+    /// the nodes from the given selection.
+    ///
+    /// This follows the same rules as `append`.
+    pub fn replace_with_selection(&mut self, sel: &Selection) {
+        for node in self.nodes() {
+            for prev_sibling in sel.nodes() {
+                node.append_prev_sibling(&prev_sibling.id);
+            }
+        }
+
+        self.remove()
+    }
+
     /// append_thml parses the html and appends it to the set of matched elements.
     pub fn append_html<T>(&mut self, html: T)
     where
         T: Into<StrTendril>,
     {
         let dom = parse_html!(html);
-        let lasti = self.size() - 1;
         let mut i = 0;
 
         for node in self.nodes() {
-            if i == lasti {
+            if i + 1== self.size() {
                 node.append_children_from_another_tree(dom.tree);
                 break;
             } else {

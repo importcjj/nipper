@@ -14,8 +14,10 @@ impl Document {
 
     pub fn find_with_matcher<'a, 'b>(&'a self, matcher: &'b Matcher) -> Selection<'a> {
         let root = self.tree.root();
+        println!("{:?}", root);
         let nodes = Matches::from_one(root, matcher.clone()).collect();
 
+        println!("{:?}", nodes);
         Selection { nodes }
     }
 
@@ -31,6 +33,12 @@ pub struct Selection<'a> {
 impl<'a> Default for Selection<'a> {
     fn default() -> Self {
         Self { nodes: vec![] }
+    }
+}
+
+impl<'a> From<Node<'a>> for Selection<'a> {
+    fn from(node: Node<'a>) -> Selection {
+        Self { nodes: vec![node] }
     }
 }
 
