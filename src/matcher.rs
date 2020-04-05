@@ -3,22 +3,22 @@ use cssparser::ParseError;
 use html5ever::{LocalName, Namespace};
 use selectors::matching;
 
-use selectors::parser::{self, Selector, SelectorParseErrorKind};
+use selectors::parser::{self, SelectorList, SelectorParseErrorKind};
 use selectors::Element;
 use std::collections::HashSet;
 use std::fmt;
 
 #[derive(Clone, Debug)]
 pub struct Matcher {
-    selector: Selector<InnerSelector>,
+    selector_list: SelectorList<InnerSelector>,
 }
 
 impl Matcher {
     pub(crate) fn new(sel: &str) -> Result<Self, ParseError<SelectorParseErrorKind>> {
         let mut input = cssparser::ParserInput::new(sel);
         let mut parser = cssparser::Parser::new(&mut input);
-        selectors::parser::Selector::parse(&InnerSelectorParser, &mut parser)
-            .map(|selector| Matcher { selector })
+        selectors::parser::SelectorList::parse(&InnerSelectorParser, &mut parser)
+            .map(|selector_list| Matcher { selector_list })
     }
 
     pub(crate) fn match_element<E>(&self, element: &E) -> bool
@@ -32,7 +32,7 @@ impl Matcher {
             matching::QuirksMode::NoQuirks,
         );
 
-        matching::matches_selector(&self.selector, 0, None, element, &mut ctx, &mut |_, _| {})
+        matching::matches_selector_list(&self.selector_list, element, &mut ctx)
     }
 }
 
