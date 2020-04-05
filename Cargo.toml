@@ -1,6 +1,11 @@
 [package]
 name = "nipper"
 version = "0.1.0"
+description = "HTML parsing，querying and manipulation."
+license = "MIT/Apache-2.0"
+repository = "https://github.com/importcjj/nipper"
+documentation = "https://docs.rs/nipper/latest"
+keywords = ["html", "css", "selector", "scraping", "crawler"]
 authors = ["importcjj <importcjj@gmail.com>"]
 edition = "2018"
 
