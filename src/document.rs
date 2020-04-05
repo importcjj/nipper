@@ -934,7 +934,12 @@ impl<'a> Serialize for SerializableNodeRef<'a> {
                         ref target,
                         ref contents,
                     } => serializer.write_processing_instruction(target, contents),
-                    NodeData::Document => continue,
+                    NodeData::Document => {
+                        for child_id in children_of!(nodes, id).into_iter().rev() {
+                            ops.insert(0, SerializeOp::Open(child_id));
+                        }
+                        continue;
+                    },
                 },
                 SerializeOp::Close(name) => serializer.end_elem(name),
             } {

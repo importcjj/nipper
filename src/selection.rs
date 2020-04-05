@@ -20,10 +20,7 @@ impl Document {
     }
 
     pub fn html(&self) -> StrTendril {
-        match self.tree.root().first_child() {
-            Some(child) => child.html(),
-            _ => StrTendril::new(),
-        }
+        self.tree.root().html()
     }
 }
 #[derive(Debug)]
