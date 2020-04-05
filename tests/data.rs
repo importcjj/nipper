@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use rsquery::Document;
+use nipper::Document;
 use std::fs::File;
 use std::io;
 use std::io::Read;
@@ -14,13 +14,13 @@ pub fn load_doc<P: AsRef<Path>>(path: P) -> io::Result<Document> {
 }
 
 pub fn doc() -> Document {
-    load_doc("testdata/page.html").unwrap()
+    load_doc("test-pages/page.html").unwrap()
 }
 
 pub fn docwiki() -> Document {
-    load_doc("testdata/rustwiki.html").unwrap()
+    load_doc("test-pages/rustwiki.html").unwrap()
 }
 
 pub fn doc2() -> Document {
-    load_doc("testdata/page2.html").unwrap()
+    load_doc("test-pages/page2.html").unwrap()
 }

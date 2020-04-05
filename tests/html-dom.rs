@@ -3,7 +3,7 @@ use html5ever::serialize::{SerializeOpts, TraversalScope};
 use html5ever::QualName;
 use html5ever::{parse_document, parse_fragment};
 use markup5ever::{local_name, namespace_url, ns};
-use rsquery::{Document, SerializableNodeRef};
+use nipper::{Document, SerializableNodeRef};
 use tendril::SliceExt;
 use tendril::StrTendril;
 use tendril::TendrilSink;

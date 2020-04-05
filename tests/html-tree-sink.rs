@@ -4,7 +4,7 @@ use html5ever::ExpandedName;
 use html5ever::QualName;
 use markup5ever::interface::{ElementFlags, NodeOrText, QuirksMode, TreeSink};
 use markup5ever::{local_name, namespace_url, ns, Attribute};
-use rsquery::{Document, NodeId};
+use nipper::{Document, NodeId};
 use std::borrow::Cow;
 use tendril::StrTendril;
 
