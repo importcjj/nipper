@@ -1,4 +1,4 @@
-use rsquery::Document;
+use nipper::Document;
 
 fn main() {
     let html = r#"

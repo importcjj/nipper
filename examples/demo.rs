@@ -1,4 +1,4 @@
-use rsquery::Document;
+use nipper::Document;
 use std::error::Error;
 use std::time::Instant;
 
