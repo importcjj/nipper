@@ -335,6 +335,7 @@ impl<T: Debug> Tree<T> {
     }
 
     pub fn append_prev_siblings_from_another_tree(&self, id: &NodeId, tree: Tree<T>) {
+        self.debug_nodes();
         with_cell_mut!(self.nodes, nodes, {
             let mut new_nodes = tree.nodes.take();
             assert!(
@@ -370,19 +371,22 @@ impl<T: Debug> Tree<T> {
             let prev_sibling_id = node.prev_sibling;
             let parent_id = node.parent;
 
-            // Update previous sibling id.
+            // Update node's previous sibling.
             node.prev_sibling = last_child_id;
 
+            // Update prev sibling's next sibling
+            if let Some(prev_sibling_id) = prev_sibling_id {
+                let mut prev_sibling = get_node_unchecked_mut!(nodes, prev_sibling_id);
+                prev_sibling.next_sibling = first_child_id;
             // Update parent's first child.
-            if prev_sibling_id.is_none() {
-                if let Some(parent_id) = parent_id {
-                    let mut parent = get_node_unchecked_mut!(nodes, parent_id);
-                    parent.first_child = first_child_id;
-                }
+            } else if let Some(parent_id) = parent_id {
+                let mut parent = get_node_unchecked_mut!(nodes, parent_id);
+                parent.first_child = first_child_id;
             }
 
             let mut i = 0;
             let mut last_valid_child = 0;
+            let mut first_valid_child = true;
             // Fix nodes's ref id.
             for node in &mut new_nodes {
                 node.parent = node
@@ -392,6 +396,12 @@ impl<T: Debug> Tree<T> {
                         i if i == TRUE_ROOT_ID => parent_id,
                         i @ _ => fix_id!(Some(NodeId::new(i))),
                     });
+
+                // Update first child's prev_sibling
+                if !first_valid_child && node.parent == Some(*id) {
+                    first_valid_child = true;
+                    node.prev_sibling = prev_sibling_id;
+                }
 
                 if node.parent == parent_id {
                     last_valid_child = i;
@@ -405,12 +415,7 @@ impl<T: Debug> Tree<T> {
                 i += 1;
             }
 
-            println!("new parent id {:?}", parent_id);
-            for node in &new_nodes {
-                println!("{:?}", node);
-            }
-
-            // Update next sibling id.
+            // Update last child's next_sibling.
             new_nodes[last_valid_child as usize].next_sibling = Some(*id);
 
             // Put all the new nodes except the root node into the nodes.
@@ -678,6 +683,10 @@ impl<'a, T: Debug> NodeRef<'a, T> {
         self.tree.remove_children_of(&self.id)
     }
 
+    pub fn append_prev_sibling(&self, id: &NodeId) {
+        self.tree.append_prev_sibling_of(&self.id, id)
+    }
+
     pub fn append_children_from_another_tree(&self, tree: Tree<T>) {
         self.tree.append_children_from_another_tree(&self.id, tree)
     }
@@ -939,7 +948,7 @@ impl<'a> Serialize for SerializableNodeRef<'a> {
                             ops.insert(0, SerializeOp::Open(child_id));
                         }
                         continue;
-                    },
+                    }
                 },
                 SerializeOp::Close(name) => serializer.end_elem(name),
             } {
