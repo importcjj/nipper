@@ -85,6 +85,6 @@ impl<'a> Iterator for Selections<Node<'a>> {
     type Item = Selection<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|node| Selection { nodes: vec![node] })
+        self.iter.next().map(Selection::from)
     }
 }
