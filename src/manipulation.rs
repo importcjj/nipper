@@ -33,7 +33,7 @@ macro_rules! parse_html {
 }
 
 impl<'a> Selection<'a> {
-    /// set the html contents of each element in the selection to specified parsed HTML.
+    /// Set the html contents of each element in the selection to specified parsed HTML.
     pub fn set_html<T>(&mut self, html: T)
     where
         T: Into<StrTendril>,
@@ -45,7 +45,7 @@ impl<'a> Selection<'a> {
         self.append_html(html)
     }
 
-    /// replace_with_html replaces each element in the set of matched elements with
+    /// Replaces each element in the set of matched elements with
     /// the parsed HTML.
     /// It returns the removed elements.
     ///
@@ -70,7 +70,7 @@ impl<'a> Selection<'a> {
         self.remove()
     }
 
-    /// replace_with_selection replaces each element in the set of matched element with
+    /// Replaces each element in the set of matched element with
     /// the nodes from the given selection.
     ///
     /// This follows the same rules as `append`.
@@ -84,7 +84,7 @@ impl<'a> Selection<'a> {
         self.remove()
     }
 
-    /// append_thml parses the html and appends it to the set of matched elements.
+    /// Parses the html and appends it to the set of matched elements.
     pub fn append_html<T>(&mut self, html: T)
     where
         T: Into<StrTendril>,
@@ -93,13 +93,23 @@ impl<'a> Selection<'a> {
         let mut i = 0;
 
         for node in self.nodes() {
-            if i + 1== self.size() {
+            if i + 1 == self.size() {
                 node.append_children_from_another_tree(dom.tree);
                 break;
             } else {
                 node.append_children_from_another_tree(dom.tree.clone());
             }
             i += 1;
+        }
+    }
+
+    /// Appends the elements in the selection to the end of each element
+    /// in the set of matched elements.
+    pub fn append_selection(&mut self, sel: &Selection) {
+        for node in self.nodes() {
+            for child in sel.nodes() {
+                node.append_child(&child.id);
+            }
         }
     }
 }

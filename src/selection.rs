@@ -14,10 +14,9 @@ impl Document {
 
     pub fn find_with_matcher<'a, 'b>(&'a self, matcher: &'b Matcher) -> Selection<'a> {
         let root = self.tree.root();
-        println!("{:?}", root);
+        // println!("{:?}", root);
         let nodes = Matches::from_one(root, matcher.clone()).collect();
 
-        println!("{:?}", nodes);
         Selection { nodes }
     }
 
@@ -25,7 +24,7 @@ impl Document {
         self.tree.root().html()
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Selection<'a> {
     pub(crate) nodes: Vec<Node<'a>>,
 }

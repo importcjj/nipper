@@ -335,7 +335,6 @@ impl<T: Debug> Tree<T> {
     }
 
     pub fn append_prev_siblings_from_another_tree(&self, id: &NodeId, tree: Tree<T>) {
-        self.debug_nodes();
         with_cell_mut!(self.nodes, nodes, {
             let mut new_nodes = tree.nodes.take();
             assert!(
@@ -687,6 +686,10 @@ impl<'a, T: Debug> NodeRef<'a, T> {
         self.tree.append_prev_sibling_of(&self.id, id)
     }
 
+    pub fn append_child(&self, id: &NodeId) {
+        self.tree.append_child_of(&self.id, id)
+    }
+
     pub fn append_children_from_another_tree(&self, tree: Tree<T>) {
         self.tree.append_children_from_another_tree(&self.id, tree)
     }
@@ -733,6 +736,13 @@ impl<'a> Node<'a> {
                 .find(|attr| &attr.name.local == name)
                 .map(|attr| attr.value.clone()),
             _ => None,
+        })
+    }
+
+    pub fn attrs(&self) -> Vec<Attribute> {
+        self.query(|node| match node.data {
+            NodeData::Element(ref e) => e.attrs.iter().map(|attr| attr.clone()).collect(),
+            _ => vec![],
         })
     }
 
