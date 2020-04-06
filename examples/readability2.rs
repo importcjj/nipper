@@ -10,7 +10,7 @@ fn main() {
     let mut html_file = File::open(&html_file_path).expect("correct HTML file path");
     let url = "https://www.wisburg.com".parse().unwrap();
 
-    let article =  extract(&mut html_file, &url).unwrap();
+    let article = extract(&mut html_file, &url).unwrap();
 
     println!("title ====> {}", article.title);
     println!("{}", article.content);

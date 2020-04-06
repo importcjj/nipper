@@ -35,8 +35,8 @@ macro_rules! is_valid_by_line {
 
 macro_rules! is_element_without_content {
     ($sel: expr) => {{
-        let html = $sel.html();
-        html.trim() == ""
+        let text = $sel.text();
+        text.trim() == ""
     }};
 }
 
@@ -459,7 +459,9 @@ fn grab_article<'a>(doc: &'a Document, title: &str) -> (tendril::StrTendril, Opt
     }
 
     for mut sel in doc.select("*").iter().into_iter() {
-        if sel.is("div") {
+        if sel.is("section,h2,h3,h4,h5,h6,p,td,pre,article") {
+            elements_to_score.push(sel);
+        } else if sel.is("div") {
             if has_single_p_inside_element!(&sel) {
                 let node = sel.children();
                 sel.replace_with_selection(&node);
@@ -517,20 +519,12 @@ fn grab_article<'a>(doc: &'a Document, title: &str) -> (tendril::StrTendril, Opt
 
     if top_candidate.is_none() {
         let mut body = doc.select("body");
-
-        let body_html = body.html();
-
-        let new_html = format!(r#"<div id="xxx-readability-body">{}<div>"#, body_html);
-        body.append_html(new_html);
-
-        let mut target_body = body.select("div#xxx-readability-body");
-        target_body.remove_attr("id");
-        let id = target_body.get(0).unwrap().id;
-        top_candidate = Some(initialize_candidate_item(target_body));
+        let id = body.get(0).unwrap().id;
+        top_candidate = Some(initialize_candidate_item(body));
     }
 
-    let new_doc = Document::from_str(r#"<div id="readability-content"></div>"#);
-    let mut content = new_doc.select("div#readability-content");
+    let new_doc = Document::from_str(r#""#);
+    let mut content = new_doc.select("body");
 
     let top_candidate = top_candidate.unwrap();
     let top_selection = &top_candidate.sel;
@@ -587,7 +581,7 @@ fn grab_article<'a>(doc: &'a Document, title: &str) -> (tendril::StrTendril, Opt
 
     pre_article(&content, title);
 
-    return (content.html(), author);
+    return (new_doc.html(), author);
 }
 
 fn pre_article(content: &Selection, title: &str) {
