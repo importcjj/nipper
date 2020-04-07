@@ -717,7 +717,7 @@ impl<'a> Node<'a> {
                         break Some(NodeRef::new(id, self.tree));
                     }
                 } else {
-                    return None;
+                    break None;
                 }
             };
             r
