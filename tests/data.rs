@@ -9,7 +9,7 @@ pub fn load_doc<P: AsRef<Path>>(path: P) -> io::Result<Document> {
     File::open(path).and_then(|mut f| {
         let mut html = String::new();
         f.read_to_string(&mut html)?;
-        Ok(Document::from_str(&html))
+        Ok(Document::from(&html))
     })
 }
 

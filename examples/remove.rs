@@ -9,14 +9,14 @@ fn main() {
 </ul>
 "#;
 
-    let document = Document::from_str(html);
+    let document = Document::from(html);
 
     let items = document.select("ul").select("li");
     let ul = items.parent();
 
     println!("{}", ul.html());
 
-    for item in items.next().iter() {
+    for mut item in items.next().iter() {
         println!("----");
         item.remove()
     }

@@ -1,4 +1,4 @@
-use crate::document::{NodeData, NodeId, NodeRef};
+use crate::dom_tree::{NodeData, NodeId, NodeRef};
 use cssparser::ParseError;
 use html5ever::{LocalName, Namespace};
 use selectors::matching;

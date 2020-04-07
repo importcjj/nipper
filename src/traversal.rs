@@ -1,10 +1,65 @@
+use crate::matcher::{Matcher, Matches};
+use crate::Document;
+use crate::Node;
 use crate::Selection;
 use std::collections::HashSet;
+use std::vec::IntoIter;
+
+impl Document {
+    /// Gets the descendants of the root document node in the current, filter by a selector.
+    /// It returns a new selection object containing these matched elements.
+    pub fn select(&self, sel: &str) -> Selection {
+        match Matcher::new(sel) {
+            Ok(matcher) => self.select_matcher(&matcher),
+            Err(_) => Default::default(),
+        }
+    }
+
+    /// Gets the descendants of the root document node in the current, filter by a matcher.
+    /// It returns a new selection object containing these matched elements.
+    pub fn select_matcher<'a, 'b>(&'a self, matcher: &'b Matcher) -> Selection<'a> {
+        let root = self.tree.root();
+        let nodes = Matches::from_one(root, matcher.clone()).collect();
+
+        Selection { nodes }
+    }
+}
 
 impl<'a> Selection<'a> {
-    /// parents gets the parent of each element in the selection. It returns a
-    /// mew selection containing these elements.
-    pub fn parent(&self) -> Self {
+    /// Gets the descendants of each element in the current set of matched
+    /// elements, filter by a selector. It returns a new Selection object
+    /// containing these matched elements.
+    pub fn select(&self, sel: &str) -> Selection<'a> {
+        match Matcher::new(sel) {
+            Ok(matcher) => Selection {
+                nodes: Matches::from_list(self.nodes.clone().into_iter(), matcher).collect(),
+            },
+            Err(_) => Default::default(),
+        }
+    }
+
+    /// Gets the descendants of each element in the current set of matched
+    /// elements, filter by a matcher. It returns a new Selection object
+    /// containing these matched elements.
+    pub fn select_matcher(&self, matcher: &Matcher) -> Selection<'a> {
+        Selection {
+            nodes: Matches::from_list(self.nodes.clone().into_iter(), matcher.clone()).collect(),
+        }
+    }
+
+    /// Returns a slice of underlying nodes.
+    pub fn nodes(&self) -> &[Node<'a>] {
+        &self.nodes
+    }
+
+    /// Creates an iterator over these matched elements.
+    pub fn iter(&self) -> Selections<Node<'a>> {
+        Selections::new(self.nodes.clone().into_iter())
+    }
+
+    /// Gets the parent of each element in the selection. It returns a
+    /// mew Selection object containing these elements.
+    pub fn parent(&self) -> Selection<'a> {
         let mut result = Vec::with_capacity(self.length());
         let mut set = HashSet::with_capacity(self.length());
 
@@ -20,9 +75,9 @@ impl<'a> Selection<'a> {
         Self { nodes: result }
     }
 
-    /// children gets the child elements of each element in the selection.
-    /// It returns a new selection containing these elements.
-    pub fn children(&self) -> Self {
+    /// Gets the child elements of each element in the selection.
+    /// It returns a new Selection object containing these elements.
+    pub fn children(&self) -> Selection<'a> {
         let mut result = Vec::with_capacity(self.length());
         let mut set = HashSet::with_capacity(self.length());
 
@@ -38,9 +93,9 @@ impl<'a> Selection<'a> {
         Self { nodes: result }
     }
 
-    /// next gets the immediately following sibling of each element in the
-    /// selection. It returns a new selection containing these elements.
-    pub fn next(&self) -> Self {
+    /// Gets the immediately following sibling of each element in the
+    /// selection. It returns a new Selection object containing these elements.
+    pub fn next(&self) -> Selection<'a> {
         let mut result = Vec::with_capacity(self.length());
         let mut set = HashSet::with_capacity(self.length());
 
@@ -54,5 +109,39 @@ impl<'a> Selection<'a> {
         }
 
         Self { nodes: result }
+    }
+
+    /// Reduces the set of matched elements to the first in the set.
+    /// It returns a new selection object, and an empty selection object if the
+    /// selection is empty.
+    pub fn first(&self) -> Selection<'a> {
+        if self.length() > 0 {
+            Selection::from(self.nodes[0].clone())
+        } else {
+            Default::default()
+        }
+    }
+
+    /// Retrives the underlying node at the specified index.
+    pub fn get(&self, index: usize) -> Option<&Node<'a>> {
+        self.nodes.get(index)
+    }
+}
+
+pub struct Selections<I> {
+    iter: IntoIter<I>,
+}
+
+impl<I> Selections<I> {
+    fn new(iter: IntoIter<I>) -> Self {
+        Self { iter }
+    }
+}
+
+impl<'a> Iterator for Selections<Node<'a>> {
+    type Item = Selection<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(Selection::from)
     }
 }

@@ -6,7 +6,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let html = reqwest::blocking::get("https://wisburg.com")?.text()?;
 
     let start = Instant::now();
-    let document = Document::from_str(&html);
+    let document = Document::from(&html);
 
     for article in document.select(".article-list .item").iter() {
         let title = article.select(".title");
