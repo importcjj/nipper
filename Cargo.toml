@@ -1,6 +1,6 @@
 [package]
 name = "nipper"
-version = "0.1.1"
+version = "0.1.2"
 description = "HTML manipulation with CSS seletors"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/importcjj/nipper"
@@ -8,6 +8,7 @@ documentation = "https://docs.rs/nipper/latest"
 keywords = ["html", "css", "selector", "scraping", "crawler"]
 authors = ["importcjj <importcjj@gmail.com>"]
 edition = "2018"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
