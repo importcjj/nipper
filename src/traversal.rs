@@ -8,10 +8,32 @@ use std::vec::IntoIter;
 impl Document {
     /// Gets the descendants of the root document node in the current, filter by a selector.
     /// It returns a new selection object containing these matched elements.
+    ///
+    /// # Panics
+    ///
+    /// Panics if failed to parse the given CSS selector.
     pub fn select(&self, sel: &str) -> Selection {
+        let matcher = Matcher::new(sel).expect("Invalid CSS selector");
+        let root = self.tree.root();
+        Selection {
+            nodes: Matches::from_one(root, matcher.clone()).collect(),
+        }
+    }
+
+    /// Gets the descendants of the root document node in the current, filter by a selector.
+    /// It returns a new selection object containing these matched elements.
+    pub fn try_select(&self, sel: &str) -> Option<Selection> {
         match Matcher::new(sel) {
-            Ok(matcher) => self.select_matcher(&matcher),
-            Err(_) => Default::default(),
+            Ok(matcher) => {
+                let root = self.tree.root();
+                let nodes: Vec<Node> = Matches::from_one(root, matcher.clone()).collect();
+                if nodes.len() > 0 {
+                    Some(Selection { nodes })
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
         }
     }
 
@@ -29,12 +51,32 @@ impl<'a> Selection<'a> {
     /// Gets the descendants of each element in the current set of matched
     /// elements, filter by a selector. It returns a new Selection object
     /// containing these matched elements.
+    ///
+    /// # Panics
+    ///
+    /// Panics if failed to parse the given CSS selector.
     pub fn select(&self, sel: &str) -> Selection<'a> {
+        let matcher = Matcher::new(sel).expect("Invalid CSS seletor");
+        Selection {
+            nodes: Matches::from_list(self.nodes.clone().into_iter(), matcher).collect(),
+        }
+    }
+
+    /// Gets the descendants of each element in the current set of matched
+    /// elements, filter by a selector. It returns a new Selection object
+    /// containing these matched elements.
+    pub fn try_select(&self, sel: &str) -> Option<Selection<'a>> {
         match Matcher::new(sel) {
-            Ok(matcher) => Selection {
-                nodes: Matches::from_list(self.nodes.clone().into_iter(), matcher).collect(),
-            },
-            Err(_) => Default::default(),
+            Ok(matcher) => {
+                let nodes: Vec<Node> =
+                    Matches::from_list(self.nodes.clone().into_iter(), matcher).collect();
+                if nodes.len() > 0 {
+                    Some(Selection { nodes })
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
         }
     }
 
