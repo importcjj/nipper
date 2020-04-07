@@ -47,6 +47,11 @@ impl<'a> Selection<'a> {
         self.length()
     }
 
+    /// Is there any matched elements.
+    pub fn exists(&self) -> bool {
+        self.length() > 0
+    }
+
     /// Works like `attr` but returns default value if attribute is not present.
     pub fn attr_or(&self, name: &str, default: &str) -> StrTendril {
         self.attr(name).unwrap_or_else(|| StrTendril::from(default))

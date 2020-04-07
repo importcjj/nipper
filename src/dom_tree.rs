@@ -28,6 +28,8 @@ macro_rules! get_node_unchecked_mut {
     };
 }
 
+// DO NOT use *return* in the block! Otherwise,  it will skip
+// the set operation and causes the Segmentation fault.
 macro_rules! with_cell {
     ($cell: expr, $bind_value: ident, $some_work: block) => {{
         let $bind_value = $cell.take();
@@ -37,6 +39,8 @@ macro_rules! with_cell {
     }};
 }
 
+// DO NOT use *return* in the block! Otherwise,  it will skip
+// the set operation and causes the Segmentation fault.
 macro_rules! with_cell_mut {
     ($cell: expr, $bind_value: ident, $some_work: block) => {{
         let mut $bind_value = $cell.take();
@@ -702,18 +706,21 @@ impl<'a, T: Debug> NodeRef<'a, T> {
 }
 
 impl<'a> Node<'a> {
-    pub fn next_element_sibling(&self) -> Option<Self> {
+    pub fn next_element_sibling(&self) -> Option<Node<'a>> {
         with_cell!(self.tree.nodes, nodes, {
-            let node = get_node_unchecked!(nodes, self.id);
-            let mut next_sibling = node.next_sibling;
-            while let Some(id) = next_sibling {
-                let node = get_node_unchecked!(nodes, id);
-                if node.is_element() {
-                    return Some(NodeRef::new(id, self.tree));
+            let mut node = get_node_unchecked!(nodes, self.id);
+
+            let r = loop {
+                if let Some(id) = node.next_sibling {
+                    node = get_node_unchecked!(nodes, id);
+                    if node.is_element() {
+                        break Some(NodeRef::new(id, self.tree));
+                    }
+                } else {
+                    return None;
                 }
-                next_sibling = node.next_sibling;
-            }
-            None
+            };
+            r
         })
     }
 }

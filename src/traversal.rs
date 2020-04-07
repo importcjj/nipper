@@ -122,7 +122,18 @@ impl<'a> Selection<'a> {
         }
     }
 
-    /// Retrives the underlying node at the specified index.
+    /// Reduces the set of matched elements to the last in the set.
+    /// It returns a new selection object, and an empty selection object if the
+    /// selection is empty.
+    pub fn last(&self) -> Selection<'a> {
+        if self.length() > 0 {
+            Selection::from(self.nodes[self.length() - 1].clone())
+        } else {
+            Default::default()
+        }
+    }
+
+    /// Retrieves the underlying node at the specified index.
     pub fn get(&self, index: usize) -> Option<&Node<'a>> {
         self.nodes.get(index)
     }
