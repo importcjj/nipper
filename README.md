@@ -19,6 +19,10 @@
     <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
       alt="docs.rs docs" />
   </a>
+
+  <a href="https://travis-ci.com/github/importcjj/nipper">
+    <img src="https://travis-ci.com/importcjj/nipper.svg?branch=master" alt="travis ci" />
+  </a>
 </div>
 
 
