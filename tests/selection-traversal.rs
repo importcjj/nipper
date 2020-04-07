@@ -18,6 +18,7 @@ fn test_select_not_self() {
 }
 
 #[test]
+#[should_panic]
 fn test_select_invalid() {
     let doc = doc();
     let sel = doc.select(":+ ^");
@@ -41,6 +42,7 @@ fn test_chained_select() {
 }
 
 #[test]
+#[should_panic]
 fn test_chained_select_invalid() {
     let doc = doc();
     let sel = doc.select("div.hero-unit").select("");
