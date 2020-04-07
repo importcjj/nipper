@@ -1,7 +1,7 @@
 use nipper::Document;
 
 fn main() {
-    let document = Document::from_str(
+    let document = Document::from(
         r#"                <div class="loginContent">
     <div class="loginContentbg">
         <div class="el-dialog__wrapper login-dialog">
@@ -21,7 +21,7 @@ fn main() {
 </div>"#,
     );
 
-    let div = document.select("div.loginContent");
+    let mut div = document.select("div.loginContent");
     println!("{}", div.is("div"));
 
     println!("|{}|", div.text().trim());

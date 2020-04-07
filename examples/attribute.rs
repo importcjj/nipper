@@ -2,7 +2,7 @@ use nipper::Document;
 
 fn main() {
     let html = r#"<div name="foo" value="bar"></div>"#;
-    let document = Document::from_str(html);
+    let document = Document::from(html);
     println!("{}", document.html());
 
     let mut input = document.select(r#"div[name="foo"]"#);

@@ -9,7 +9,7 @@ fn main() {
 </ul>
 "#;
 
-    let document = Document::from_str(html);
+    let document = Document::from(html);
 
     let items = document.select("ul").select("li");
 

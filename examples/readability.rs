@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use nipper::Document;
 use nipper::Selection;
 use regex::Regex;
-use std::cmp::{max, min};
+use std::cmp::min;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -192,7 +192,7 @@ fn remove_attrs(s: &Selection) {
 fn remove_tag(sel: &Selection, tag: &str) {
     let is_embed = (tag == "object") || (tag == "embed") || (tag == "iframe");
 
-    sel.select("tag").iter().for_each(|target| {
+    sel.select("tag").iter().for_each(|mut target| {
         let attrs = target.get(0).unwrap().attrs();
         let attr_values: Vec<&str> = attrs.iter().map(|attr| attr.value.deref()).collect();
         let attr_str = attr_values.join(" ");
@@ -210,7 +210,7 @@ fn remove_tag(sel: &Selection, tag: &str) {
 }
 
 fn remove_headers(sel: &Selection) {
-    sel.select("h1,h2,h3").iter().for_each(|h| {
+    sel.select("h1,h2,h3").iter().for_each(|mut h| {
         if get_class_or_id_weight!(h) < 0.0 {
             h.remove()
         }
@@ -316,7 +316,7 @@ fn replace_brs(doc: &Document) {
     html = &r;
     body.set_html(html);
 
-    body.select("p").iter().for_each(|p| {
+    body.select("p").iter().for_each(|mut p| {
         let html: &str = &p.html();
         if html.trim() == "" {
             p.remove();
@@ -372,7 +372,7 @@ fn get_article_metadata(doc: &Document) -> MetaData {
 }
 
 fn get_article_title(doc: &Document) -> Option<String> {
-    let original_title = doc
+    let _original_title = doc
         .select("title")
         .iter()
         .next()
@@ -410,7 +410,7 @@ fn grab_article<'a>(doc: &'a Document, title: &str) -> (tendril::StrTendril, Opt
             .node_name()
             .unwrap_or_else(|| tendril::StrTendril::new());
 
-        let sel = Selection::from(node.clone());
+        let mut sel = Selection::from(node.clone());
         let class: &str = &sel.attr_or("class", "");
         let id: &str = &sel.attr_or("id", "");
         let match_str = [class.to_lowercase(), id.to_lowercase()].join(" ");
@@ -492,7 +492,7 @@ fn grab_article<'a>(doc: &'a Document, title: &str) -> (tendril::StrTendril, Opt
         content_score += min(text.len() / 100, 3) as f64;
 
         for (level, ancestor) in ancestors.into_iter().enumerate() {
-            let mut score_driver = if level == 0 {
+            let score_driver = if level == 0 {
                 1
             } else if level == 1 {
                 2
@@ -518,17 +518,16 @@ fn grab_article<'a>(doc: &'a Document, title: &str) -> (tendril::StrTendril, Opt
     }
 
     if top_candidate.is_none() {
-        let mut body = doc.select("body");
-        let id = body.get(0).unwrap().id;
+        let body = doc.select("body");
         top_candidate = Some(initialize_candidate_item(body));
     }
 
-    let new_doc = Document::from_str(r#""#);
+    let new_doc = Document::from(r#""#);
     let mut content = new_doc.select("body");
 
     let top_candidate = top_candidate.unwrap();
     let top_selection = &top_candidate.sel;
-    let top_candidate_class = top_selection.attr_or("class", "");
+    // let top_candidate_class = top_selection.attr_or("class", "");
     let sibling_score_threshold = (top_candidate.score * 0.2).max(10.0);
     top_selection
         .parent()
@@ -538,13 +537,13 @@ fn grab_article<'a>(doc: &'a Document, title: &str) -> (tendril::StrTendril, Opt
             let append_sibling = if sibling.is_selection(&top_selection) {
                 true
             } else {
-                let sibling_class = sibling.attr_or("class", "");
-                let bonus =
-                    if sibling_class == top_candidate_class && top_candidate_class.deref() != "" {
-                        top_candidate.score * 0.2
-                    } else {
-                        0.0
-                    };
+                // let sibling_class = sibling.attr_or("class", "");
+                // let bonus =
+                //     if sibling_class == top_candidate_class && top_candidate_class.deref() != "" {
+                //         top_candidate.score * 0.2
+                //     } else {
+                //         0.0
+                //     };
 
                 let id = sibling.get(0).unwrap().id;
                 match candidates.get(&id) {
@@ -595,7 +594,7 @@ fn pre_article(content: &Selection, title: &str) {
     remove_tag(&content, "footer");
     remove_tag(&content, "link");
 
-    content.select("*").iter().for_each(|s| {
+    content.select("*").iter().for_each(|mut s| {
         let id = s.attr_or("id", "");
         let class = s.attr_or("class", "");
         let match_str = format!("{} {}", id, class);
@@ -605,7 +604,7 @@ fn pre_article(content: &Selection, title: &str) {
         }
     });
 
-    let h2s = content.select("h2");
+    let mut h2s = content.select("h2");
 
     if h2s.length() == 1 {
         let text = h2s.text();
@@ -635,7 +634,7 @@ fn pre_article(content: &Selection, title: &str) {
     remove_conditionally(&content, "ul");
     // remove_conditionally(&content, "div");
 
-    content.select("p").iter().for_each(|p| {
+    content.select("p").iter().for_each(|mut p| {
         let img = p.select("img").length();
         let embed = p.select("embed").length();
         let object = p.select("object").length();
@@ -648,7 +647,7 @@ fn pre_article(content: &Selection, title: &str) {
         }
     });
 
-    content.select("br").iter().for_each(|br| {
+    content.select("br").iter().for_each(|mut br| {
         if br.next().is("p") {
             br.remove()
         }
@@ -736,7 +735,7 @@ fn main() {
         .read_to_string(&mut html)
         .expect("read HTML page file");
 
-    let document = Document::from_str(&html);
+    let document = Document::from(&html);
 
     remove_script(&document);
     remove_style(&document);

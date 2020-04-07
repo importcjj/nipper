@@ -1,44 +1,58 @@
+use crate::Document;
 use crate::Selection;
 use tendril::StrTendril;
 
+impl Document {
+    /// Gets the HTML contents of the document. It includes
+    /// the text and comment nodes.
+    pub fn html(&self) -> StrTendril {
+        self.tree.root().html()
+    }
+
+    /// Gets the text content of the document.
+    pub fn text(&self) -> StrTendril {
+        self.tree.root().text()
+    }
+}
+
 impl<'a> Selection<'a> {
-    /// attr gets the specified attribute's value for the first element in the
+    /// Gets the specified attribute's value for the first element in the
     /// selection. To get the value for each element individually, use a looping
     /// construct such as map method.
     pub fn attr(&self, name: &str) -> Option<StrTendril> {
         self.nodes().first().and_then(|node| node.attr(name))
     }
 
-    /// sets the given attribute to each element in the set of matched elements.
+    /// Sets the given attribute to each element in the set of matched elements.
     pub fn set_attr(&mut self, name: &str, val: &str) {
         for node in self.nodes() {
             node.set_attr(name, val);
         }
     }
 
-    /// remove_attr removes the named attribute from each element in the set of matched elements.
+    /// Removes the named attribute from each element in the set of matched elements.
     pub fn remove_attr(&mut self, name: &str) {
         for node in self.nodes() {
             node.remove_attr(name);
         }
     }
 
-    /// length returns the number of elements in the selection object.
+    /// Returns the number of elements in the selection object.
     pub fn length(&self) -> usize {
         self.nodes().len()
     }
 
-    /// size is an alias for `length`.
+    /// Is an alias for `length`.
     pub fn size(&self) -> usize {
         self.length()
     }
 
-    /// attor_or works like `attr` but returns default value if attribute is not present.
+    /// Works like `attr` but returns default value if attribute is not present.
     pub fn attr_or(&self, name: &str, default: &str) -> StrTendril {
         self.attr(name).unwrap_or_else(|| StrTendril::from(default))
     }
 
-    /// html gets the HTML contents of the first element in the set of matched
+    /// Gets the HTML contents of the first element in the set of matched
     /// elements. It includes the text and comment nodes.
     pub fn html(&self) -> StrTendril {
         if self.length() > 0 {
@@ -48,7 +62,7 @@ impl<'a> Selection<'a> {
         StrTendril::new()
     }
 
-    /// text get the combined text content of each element in the set of matched
+    /// Gets the combined text content of each element in the set of matched
     /// elements, including their descendants.
     pub fn text(&self) -> StrTendril {
         let mut s = StrTendril::new();

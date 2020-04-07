@@ -33,6 +33,13 @@ macro_rules! parse_html {
 }
 
 impl<'a> Selection<'a> {
+    /// Removes the set of matched elements from the document.
+    pub fn remove(&mut self) {
+        for node in &self.nodes {
+            node.remove_from_parent()
+        }
+    }
+
     /// Set the html contents of each element in the selection to specified parsed HTML.
     pub fn set_html<T>(&mut self, html: T)
     where

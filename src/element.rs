@@ -1,6 +1,6 @@
 use crate::matcher::InnerSelector;
 
-use crate::document::{Node, NodeData};
+use crate::dom_tree::{Node, NodeData};
 use selectors::attr::AttrSelectorOperation;
 use selectors::attr::CaseSensitivity;
 use selectors::attr::NamespaceConstraint;
