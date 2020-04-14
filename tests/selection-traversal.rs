@@ -74,21 +74,21 @@ fn test_parent_body() {
 #[test]
 fn test_next() {
     let doc = doc();
-    let sel = doc.select("h1").next();
+    let sel = doc.select("h1").next_sibling();
     assert_eq!(sel.length(), 1)
 }
 
 #[test]
 fn test_next2() {
     let doc = doc();
-    let sel = doc.select(".close").next();
+    let sel = doc.select(".close").next_sibling();
     assert_eq!(sel.length(), 1)
 }
 
 #[test]
 fn test_next_none() {
     let doc = doc();
-    let sel = doc.select("small").next();
+    let sel = doc.select("small").next_sibling();
     assert_eq!(sel.length(), 0)
 }
 

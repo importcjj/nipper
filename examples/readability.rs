@@ -648,7 +648,7 @@ fn pre_article(content: &Selection, title: &str) {
     });
 
     content.select("br").iter().for_each(|mut br| {
-        if br.next().is("p") {
+        if br.next_sibling().is("p") {
             br.remove()
         }
     })
