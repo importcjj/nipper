@@ -26,7 +26,7 @@ impl Document {
     /// # Panics
     ///
     /// Panics if failed to parse the given CSS selector.
-    pub fn find(&self, sel: &str) -> Selection {
+    pub fn nip(&self, sel: &str) -> Selection {
         self.select(sel)
     }
 
@@ -85,16 +85,8 @@ impl<'a> Selection<'a> {
     /// # Panics
     ///
     /// Panics if failed to parse the given CSS selector.
-    pub fn find(&self, sel: &str) -> Selection<'a> {
-        let matcher = Matcher::new(sel).expect("Invalid CSS seletor");
-        Selection {
-            nodes: Matches::from_list(
-                self.nodes.clone().into_iter(),
-                matcher,
-                MatchScope::ChildrenOnly,
-            )
-            .collect(),
-        }
+    pub fn nip(&self, sel: &str) -> Selection<'a> {
+        self.select(sel)
     }
 
     /// Gets the descendants of each element in the current set of matched
