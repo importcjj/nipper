@@ -1,7 +1,7 @@
 use crate::dom_tree::Node;
 
 /// Selection represents a collection of nodes matching some criteria. The
-/// initial Selection object can be created by using `Doucment.select`, and then
+/// initial Selection object can be created by using [`Document::select`], and then
 /// manipulated using methods itself.
 #[derive(Debug, Clone)]
 pub struct Selection<'a> {
