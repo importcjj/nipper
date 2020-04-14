@@ -1,4 +1,4 @@
-use crate::matcher::{Matcher, Matches};
+use crate::matcher::{MatchScope, Matcher, Matches};
 use crate::Document;
 use crate::Node;
 use crate::Selection;
@@ -16,8 +16,18 @@ impl Document {
         let matcher = Matcher::new(sel).expect("Invalid CSS selector");
         let root = self.tree.root();
         Selection {
-            nodes: Matches::from_one(root, matcher.clone()).collect(),
+            nodes: Matches::from_one(root, matcher.clone(), MatchScope::IncludeNode).collect(),
         }
+    }
+
+    /// Alias for `select`, it gets the descendants of the root document node in the current, filter by a selector.
+    /// It returns a new selection object containing these matched elements.
+    ///
+    /// # Panics
+    ///
+    /// Panics if failed to parse the given CSS selector.
+    pub fn find(&self, sel: &str) -> Selection {
+        self.select(sel)
     }
 
     /// Gets the descendants of the root document node in the current, filter by a selector.
@@ -26,7 +36,8 @@ impl Document {
         match Matcher::new(sel) {
             Ok(matcher) => {
                 let root = self.tree.root();
-                let nodes: Vec<Node> = Matches::from_one(root, matcher.clone()).collect();
+                let nodes: Vec<Node> =
+                    Matches::from_one(root, matcher.clone(), MatchScope::ChildrenOnly).collect();
                 if nodes.len() > 0 {
                     Some(Selection { nodes })
                 } else {
@@ -41,7 +52,7 @@ impl Document {
     /// It returns a new selection object containing these matched elements.
     pub fn select_matcher<'a, 'b>(&'a self, matcher: &'b Matcher) -> Selection<'a> {
         let root = self.tree.root();
-        let nodes = Matches::from_one(root, matcher.clone()).collect();
+        let nodes = Matches::from_one(root, matcher.clone(), MatchScope::IncludeNode).collect();
 
         Selection { nodes }
     }
@@ -58,7 +69,31 @@ impl<'a> Selection<'a> {
     pub fn select(&self, sel: &str) -> Selection<'a> {
         let matcher = Matcher::new(sel).expect("Invalid CSS seletor");
         Selection {
-            nodes: Matches::from_list(self.nodes.clone().into_iter(), matcher).collect(),
+            nodes: Matches::from_list(
+                self.nodes.clone().into_iter(),
+                matcher,
+                MatchScope::ChildrenOnly,
+            )
+            .collect(),
+        }
+    }
+
+    /// Alias for `select`, it gets the descendants of each element in the current set of matched
+    /// elements, filter by a selector. It returns a new Selection object
+    /// containing these matched elements.
+    ///
+    /// # Panics
+    ///
+    /// Panics if failed to parse the given CSS selector.
+    pub fn find(&self, sel: &str) -> Selection<'a> {
+        let matcher = Matcher::new(sel).expect("Invalid CSS seletor");
+        Selection {
+            nodes: Matches::from_list(
+                self.nodes.clone().into_iter(),
+                matcher,
+                MatchScope::ChildrenOnly,
+            )
+            .collect(),
         }
     }
 
@@ -68,8 +103,12 @@ impl<'a> Selection<'a> {
     pub fn try_select(&self, sel: &str) -> Option<Selection<'a>> {
         match Matcher::new(sel) {
             Ok(matcher) => {
-                let nodes: Vec<Node> =
-                    Matches::from_list(self.nodes.clone().into_iter(), matcher).collect();
+                let nodes: Vec<Node> = Matches::from_list(
+                    self.nodes.clone().into_iter(),
+                    matcher,
+                    MatchScope::ChildrenOnly,
+                )
+                .collect();
                 if nodes.len() > 0 {
                     Some(Selection { nodes })
                 } else {
@@ -85,7 +124,12 @@ impl<'a> Selection<'a> {
     /// containing these matched elements.
     pub fn select_matcher(&self, matcher: &Matcher) -> Selection<'a> {
         Selection {
-            nodes: Matches::from_list(self.nodes.clone().into_iter(), matcher.clone()).collect(),
+            nodes: Matches::from_list(
+                self.nodes.clone().into_iter(),
+                matcher.clone(),
+                MatchScope::ChildrenOnly,
+            )
+            .collect(),
         }
     }
 
