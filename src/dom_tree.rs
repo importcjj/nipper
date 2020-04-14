@@ -723,6 +723,24 @@ impl<'a> Node<'a> {
             r
         })
     }
+
+    pub fn prev_element_sibling(&self) -> Option<Node<'a>> {
+        with_cell!(self.tree.nodes, nodes, {
+            let mut node = get_node_unchecked!(nodes, self.id);
+
+            let r = loop {
+                if let Some(id) = node.prev_sibling {
+                    node = get_node_unchecked!(nodes, id);
+                    if node.is_element() {
+                        break Some(NodeRef::new(id, self.tree));
+                    }
+                } else {
+                    break None;
+                }
+            };
+            r
+        })
+    }
 }
 
 impl<'a> Node<'a> {

@@ -1,6 +1,6 @@
-use crate::matcher::InnerSelector;
-
 use crate::dom_tree::{Node, NodeData};
+use crate::matcher::InnerSelector;
+use markup5ever::{namespace_url, ns};
 use selectors::attr::AttrSelectorOperation;
 use selectors::attr::CaseSensitivity;
 use selectors::attr::NamespaceConstraint;
@@ -39,16 +39,22 @@ impl<'a> selectors::Element for Node<'a> {
 
     // Skips non-element nodes.
     fn prev_sibling_element(&self) -> Option<Self> {
-        None
+        self.prev_element_sibling()
     }
 
     // Skips non-element nodes.
     fn next_sibling_element(&self) -> Option<Self> {
-        None
+        self.next_element_sibling()
     }
 
     fn is_html_element_in_html_document(&self) -> bool {
-        false
+        self.query(|node| {
+            if let NodeData::Element(ref e) = node.data {
+                return e.name.ns == ns!(html);
+            }
+
+            false
+        })
     }
 
     fn has_local_name(&self, local_name: &<Self::Impl as SelectorImpl>::BorrowedLocalName) -> bool {
@@ -62,8 +68,14 @@ impl<'a> selectors::Element for Node<'a> {
     }
 
     // Empty string for no namespace.
-    fn has_namespace(&self, _ns: &<Self::Impl as SelectorImpl>::BorrowedNamespaceUrl) -> bool {
-        false
+    fn has_namespace(&self, ns: &<Self::Impl as SelectorImpl>::BorrowedNamespaceUrl) -> bool {
+        self.query(|node| {
+            if let NodeData::Element(ref e) = node.data {
+                return &e.name.ns == ns;
+            }
+
+            false
+        })
     }
 
     // Whether this element and the `other` element have the same local name and namespace.
@@ -120,7 +132,13 @@ impl<'a> selectors::Element for Node<'a> {
 
     // Whether this element is a `link`.
     fn is_link(&self) -> bool {
-        false
+        self.query(|node| {
+            if let NodeData::Element(ref e) = node.data {
+                return &e.name.local == "link";
+            }
+
+            false
+        })
     }
 
     // Whether the element is an HTML element.
