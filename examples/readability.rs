@@ -23,6 +23,9 @@ lazy_static! {
     static ref RE_DIV_TO_P_ELEMENTS: Regex = Regex::new(r#"(?is)<(a|blockquote|dl|div|img|ol|p|pre|table|ul|select)"#).unwrap();
     static ref RE_VIDEOS: Regex = Regex::new(r#"(?is)//(www\.)?(dailymotion|youtube|youtube-nocookie|player\.vimeo)\.com"#).unwrap();
     static ref RE_P_IS_SENTENCE: Regex = Regex::new(r#"(?is)\.( |$)"#).unwrap();
+    static ref RE_COMMENTS: Regex = Regex::new(r#"(?is)<!--[^>]+-->"#).unwrap();
+    static ref RE_KILL_BREAKS: Regex = Regex::new(r#"(?is)(<br\s*/?>(\s|&nbsp;?)*)+"#).unwrap();
+    static ref RE_SPACES: Regex = Regex::new(r#"(?is)\s{2,}|\n+"#).unwrap();
 }
 
 const DATA_TABLE_ATTR: &'static str = "XXX-DATA-TABLE";
@@ -245,7 +248,7 @@ fn remove_conditionally(s: &Selection, tag: &str) {
         if commas_count < 10 {
             let p = node.select("p").length() as f64;
             let img = node.select("img").length() as f64;
-            let li = (node.select("li").length() - 100) as f64;
+            let li = node.select("li").length() as f64 - 100.0;
             let input = node.select("input").length() as f64;
 
             let mut embed_count = 0;
@@ -406,7 +409,7 @@ fn initialize_candidate_item(sel: Selection) -> CandidateItem {
     }
 }
 
-fn grab_article<'a>(doc: &'a Document, title: &str) -> (tendril::StrTendril, Option<String>) {
+fn grab_article<'a>(doc: &'a Document, title: &str) -> (String, Option<String>) {
     let mut author = None;
     let mut elements_to_score = vec![];
     for node in doc.select("*").nodes() {
@@ -584,7 +587,16 @@ fn grab_article<'a>(doc: &'a Document, title: &str) -> (tendril::StrTendril, Opt
 
     pre_article(&content, title);
 
-    return (new_doc.html(), author);
+    return (clean_html(&new_doc), author);
+}
+
+fn clean_html(doc: &Document) -> String {
+    let html = doc.html().to_string();
+    let html = RE_COMMENTS.replace_all(&html, "");
+    let html = RE_KILL_BREAKS.replace_all(&html, "<br />");
+    let html = RE_SPACES.replace_all(&html, "");
+
+    html.to_string()
 }
 
 fn pre_article(content: &Selection, title: &str) {
