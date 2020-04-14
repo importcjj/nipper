@@ -16,8 +16,7 @@ fn main() {
 
     println!("{}", ul.html());
 
-    for mut item in items.next().iter() {
-        println!("----");
+    for mut item in items.next_sibling().iter() {
         item.remove()
     }
 
