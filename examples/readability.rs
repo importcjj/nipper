@@ -5,8 +5,8 @@ use regex::Regex;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
-use std::io::Read;
+// use std::fs::File;
+// use std::io::Read;
 use std::ops::Deref;
 use std::time::Instant;
 lazy_static! {
@@ -368,18 +368,22 @@ fn get_article_metadata(doc: &Document) -> MetaData {
         }
     });
 
+    if metadata.title.is_none() {
+        metadata.title = get_article_title(doc);
+    }
+
     metadata
 }
 
 fn get_article_title(doc: &Document) -> Option<String> {
-    let _original_title = doc
+    let original_title = doc
         .select("title")
         .iter()
         .next()
         .map(|t| t.text())
         .unwrap_or_else(|| tendril::StrTendril::new());
 
-    None
+    Some(original_title.to_string())
 }
 
 fn initialize_candidate_item(sel: Selection) -> CandidateItem {
@@ -608,7 +612,8 @@ fn pre_article(content: &Selection, title: &str) {
 
     if h2s.length() == 1 {
         let text = h2s.text();
-        let length_similar_rate = (text.len() - title.len()) as f64 / title.len() as f64;
+        println!("{} {}", text.len(), title.len());
+        let length_similar_rate = text.len() as f64 / title.len() as f64 - 1.0;
 
         if length_similar_rate.abs() < 0.5 {
             let title_matches = if length_similar_rate > 0.0 {
@@ -728,12 +733,13 @@ fn get_table_row_and_column_count(table: &Selection) -> (usize, usize) {
 
 fn main() {
     let start = Instant::now();
-    let html_file_path = env::args().skip(1).next().unwrap();
-    let mut html = String::new();
-    let mut html_file = File::open(&html_file_path).expect("correct HTML file path");
-    html_file
-        .read_to_string(&mut html)
-        .expect("read HTML page file");
+    let url = env::args().skip(1).next().unwrap();
+    let html = reqwest::blocking::get(&url).unwrap().text().unwrap();
+    // let mut html = String::new();
+    // let mut html_file = File::open(&html_file_path).expect("correct HTML file path");
+    // html_file
+    //     .read_to_string(&mut html)
+    //     .expect("read HTML page file");
 
     let document = Document::from(&html);
 

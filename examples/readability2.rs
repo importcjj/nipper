@@ -3,14 +3,16 @@ use std::time::Instant;
 
 use std::env;
 use std::fs::File;
+use std::io::Cursor;
 
 fn main() {
     let start = Instant::now();
-    let html_file_path = env::args().skip(1).next().unwrap();
-    let mut html_file = File::open(&html_file_path).expect("correct HTML file path");
-    let url = "https://www.wisburg.com".parse().unwrap();
+    let url = env::args().skip(1).next().unwrap();
+    let html = reqwest::blocking::get(&url).unwrap().text().unwrap();
+    let url = &url.parse().unwrap();
+    let mut c = Cursor::new(html.as_bytes());
 
-    let article = extract(&mut html_file, &url).unwrap();
+    let article = extract(&mut c, &url).unwrap();
 
     println!("title ====> {}", article.title);
     println!("{}", article.content);
