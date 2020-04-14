@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let document = Document::from(&html);
 
-    for article in document.select(".article-list .item").iter() {
+    for article in document.nip(".article-list .item").iter() {
         let title = article.select(".title");
         let summary = article.select(".summary");
         println!("title => {}", title.text());
