@@ -1,6 +1,6 @@
 [package]
 name = "nipper"
-version = "0.1.6"
+version = "0.1.7"
 description = "HTML manipulation with CSS seletors"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/importcjj/nipper"
