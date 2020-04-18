@@ -9,6 +9,7 @@ use markup5ever::QualName;
 use markup5ever::{namespace_url, ns};
 use std::cell::Cell;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt::{self, Debug};
 use std::io;
 use tendril::StrTendril;
@@ -743,6 +744,14 @@ impl<'a> Node<'a> {
     }
 }
 
+macro_rules! contains_class {
+    ($value: expr, $class: expr) => {{
+        let class_str = format!(" {} ", $value);
+        let target = format!(" {} ", $class.trim());
+        class_str.contains(&target)
+    }};
+}
+
 impl<'a> Node<'a> {
     pub fn node_name(&self) -> Option<StrTendril> {
         self.query(|node| match node.data {
@@ -751,6 +760,90 @@ impl<'a> Node<'a> {
                 Some(StrTendril::from(name))
             }
             _ => None,
+        })
+    }
+
+    pub fn has_class(&self, class: &str) -> bool {
+        self.query(|node| match node.data {
+            NodeData::Element(ref e) => e
+                .attrs
+                .iter()
+                .find(|attr| &attr.name.local == "class")
+                .map(|attr| contains_class!(attr.value, class))
+                .unwrap_or(false),
+            _ => false,
+        })
+    }
+
+    pub fn add_class(&self, class: &str) {
+        if class.trim().len() == 0 {
+            return;
+        }
+
+        self.update(|node| match node.data {
+            NodeData::Element(ref mut e) => {
+                let mut attr = e.attrs.iter_mut().find(|attr| &attr.name.local == "class");
+
+                let set: HashSet<String> = class
+                    .split(" ")
+                    .map(|s| s.trim())
+                    .filter(|s| s.len() > 0)
+                    .map(|s| s.to_string())
+                    .collect();
+
+                if attr.is_some() {
+                    let value = &mut attr.as_mut().unwrap().value;
+                    for v in set {
+                        if !contains_class!(value, &v) {
+                            value.push_slice(" ");
+                            value.push_slice(&v);
+                        }
+                    }
+                } else {
+                    let classes: Vec<&str> = set.iter().map(|s| s.as_str()).collect();
+                    let value = StrTendril::from(classes.join(" "));
+                    // The namespace on the attribute name is almost always ns!().
+                    let name = QualName::new(None, ns!(), LocalName::from("class"));
+
+                    e.attrs.push(Attribute { name, value })
+                }
+            }
+            _ => (),
+        })
+    }
+
+    pub fn remove_class(&self, class: &str) {
+        if class.trim().len() == 0 {
+            return;
+        }
+
+        self.update(|node| match node.data {
+            NodeData::Element(ref mut e) => {
+                e.attrs
+                    .iter_mut()
+                    .find(|attr| &attr.name.local == "class")
+                    .map(|attr| {
+                        let mut set: HashSet<&str> = attr
+                            .value
+                            .split(" ")
+                            .map(|s| s.trim())
+                            .filter(|s| s.len() > 0)
+                            .collect();
+
+                        let removes = class
+                            .split(" ")
+                            .map(|s| s.trim())
+                            .filter(|s| s.len() > 0);
+
+                        for remove in removes {
+                            set.remove(remove);
+                        }
+
+                        attr.value =
+                            StrTendril::from(set.into_iter().collect::<Vec<&str>>().join(" "));
+                    });
+            }
+            _ => (),
         })
     }
 

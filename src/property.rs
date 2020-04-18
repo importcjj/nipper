@@ -23,6 +23,11 @@ impl<'a> Selection<'a> {
         self.nodes().first().and_then(|node| node.attr(name))
     }
 
+    /// Works like `attr` but returns default value if attribute is not present.
+    pub fn attr_or(&self, name: &str, default: &str) -> StrTendril {
+        self.attr(name).unwrap_or_else(|| StrTendril::from(default))
+    }
+
     /// Sets the given attribute to each element in the set of matched elements.
     pub fn set_attr(&mut self, name: &str, val: &str) {
         for node in self.nodes() {
@@ -34,6 +39,28 @@ impl<'a> Selection<'a> {
     pub fn remove_attr(&mut self, name: &str) {
         for node in self.nodes() {
             node.remove_attr(name);
+        }
+    }
+
+    /// Adds the given class to each element in the set of matched elements.
+    /// Multiple class names can be specified, separated by a space via multiple arguments.
+    pub fn add_class(&mut self, class: &str) {
+        for node in self.nodes() {
+            node.add_class(class);
+        }
+    }
+
+    /// Determines whether any of the matched elements are assigned the
+    /// given class.
+    pub fn has_class(&self, class: &str) -> bool {
+        self.nodes().iter().any(|node| node.has_class(class))
+    }
+
+    /// Removes the given class from each element in the set of matched elements.
+    /// Multiple class names can be specified, separated by a space via multiple arguments.
+    pub fn remove_class(&mut self, class: &str) {
+        for node in self.nodes() {
+            node.remove_class(class);
         }
     }
 
@@ -50,11 +77,6 @@ impl<'a> Selection<'a> {
     /// Is there any matched elements.
     pub fn exists(&self) -> bool {
         self.length() > 0
-    }
-
-    /// Works like `attr` but returns default value if attribute is not present.
-    pub fn attr_or(&self, name: &str, default: &str) -> StrTendril {
-        self.attr(name).unwrap_or_else(|| StrTendril::from(default))
     }
 
     /// Gets the HTML contents of the first element in the set of matched
