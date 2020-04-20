@@ -1,7 +1,7 @@
 
 # Nipper
 
-> Manipulation HTML with CSS Selectors.
+> A crate for manipulating HTML with Rust.
 
 <div>
   <!-- Crates version -->
