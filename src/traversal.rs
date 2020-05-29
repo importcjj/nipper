@@ -242,6 +242,7 @@ impl<'a> Selection<'a> {
     }
 }
 
+/// Iterator over a collection of matched elements.
 pub struct Selections<I> {
     iter: IntoIter<I>,
 }
@@ -257,5 +258,11 @@ impl<'a> Iterator for Selections<Node<'a>> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(Selection::from)
+    }
+}
+
+impl<'a> DoubleEndedIterator for Selections<Node<'a>> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter.next_back().map(Selection::from)
     }
 }

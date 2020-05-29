@@ -44,3 +44,5 @@ pub use dom_tree::NodeId;
 #[doc(hidden)]
 pub use dom_tree::SerializableNodeRef;
 pub use selection::Selection;
+pub use matcher::Matcher;
+pub use traversal::Selections;

@@ -8,6 +8,7 @@ use selectors::Element;
 use std::collections::HashSet;
 use std::fmt;
 
+/// CSS selector.
 #[derive(Clone, Debug)]
 pub struct Matcher {
     selector_list: SelectorList<InnerSelector>,
