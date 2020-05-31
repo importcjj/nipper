@@ -5,8 +5,8 @@ use regex::Regex;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::env;
-// use std::fs::File;
-// use std::io::Read;
+use std::fs::File;
+use std::io::Read;
 use std::ops::Deref;
 use std::time::Instant;
 lazy_static! {
@@ -745,13 +745,13 @@ fn get_table_row_and_column_count(table: &Selection) -> (usize, usize) {
 
 fn main() {
     let start = Instant::now();
-    let url = env::args().skip(1).next().unwrap();
-    let html = reqwest::blocking::get(&url).unwrap().text().unwrap();
-    // let mut html = String::new();
-    // let mut html_file = File::open(&html_file_path).expect("correct HTML file path");
-    // html_file
-    //     .read_to_string(&mut html)
-    //     .expect("read HTML page file");
+    let path = env::args().skip(1).next().unwrap();
+    // let html = reqwest::blocking::get(&path).unwrap().text().unwrap();
+    let mut html = String::new();
+    let mut html_file = File::open(&path).expect("correct HTML file path");
+    html_file
+        .read_to_string(&mut html)
+        .expect("read HTML page file");
 
     let document = Document::from(&html);
 

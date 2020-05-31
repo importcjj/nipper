@@ -7,9 +7,8 @@ use markup5ever::serialize::{Serialize, Serializer};
 use markup5ever::Attribute;
 use markup5ever::QualName;
 use markup5ever::{namespace_url, ns};
-use std::cell::Cell;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug};
 use std::io;
 use tendril::StrTendril;
@@ -33,9 +32,9 @@ macro_rules! get_node_unchecked_mut {
 // the set operation and causes the Segmentation fault.
 macro_rules! with_cell {
     ($cell: expr, $bind_value: ident, $some_work: block) => {{
-        let $bind_value = $cell.take();
+        let $bind_value = $cell.borrow();
         let r = $some_work;
-        $cell.set($bind_value);
+        // $cell.set($bind_value);
         r
     }};
 }
@@ -44,9 +43,9 @@ macro_rules! with_cell {
 // the set operation and causes the Segmentation fault.
 macro_rules! with_cell_mut {
     ($cell: expr, $bind_value: ident, $some_work: block) => {{
-        let mut $bind_value = $cell.take();
+        let mut $bind_value = $cell.borrow_mut();
         let r = $some_work;
-        $cell.set($bind_value);
+        // $cell.set($bind_value);
         r
     }};
 }
@@ -93,7 +92,7 @@ impl NodeId {
 
 /// An implementation of arena-tree.
 pub struct Tree<T> {
-    nodes: Cell<Vec<InnerNode<T>>>,
+    nodes: RefCell<Vec<InnerNode<T>>>,
     names: HashMap<NodeId, QualName>,
 }
 
@@ -107,7 +106,7 @@ impl<T: Clone> Clone for Tree<T> {
     fn clone(&self) -> Self {
         with_cell!(self.nodes, nodes, {
             Self {
-                nodes: Cell::new(nodes.clone()),
+                nodes: RefCell::new(nodes.clone()),
                 names: self.names.clone(),
             }
         })
@@ -122,17 +121,17 @@ impl<T: Debug> Tree<T> {
     pub fn new(root: T) -> Self {
         let root_id = NodeId::new(0);
         Self {
-            nodes: Cell::new(vec![InnerNode::new(root_id, root)]),
-            names: HashMap::new(),
+            nodes: RefCell::new(vec![InnerNode::new(root_id, root)]),
+            names: HashMap::default(),
         }
     }
 
     pub fn create_node(&self, data: T) -> NodeId {
-        let mut nodes = self.nodes.take();
+        let mut nodes = self.nodes.borrow_mut();
         let new_child_id = NodeId::new(nodes.len());
 
         nodes.push(InnerNode::new(new_child_id, data));
-        self.nodes.set(nodes);
+        // self.nodes.set(nodes);
         new_child_id
     }
 
@@ -145,13 +144,13 @@ impl<T: Debug> Tree<T> {
     }
 
     pub fn get(&self, id: &NodeId) -> Option<NodeRef<T>> {
-        let nodes = self.nodes.take();
+        let nodes = self.nodes.borrow();
         let node = nodes.get(id.value).map(|_| NodeRef {
             id: *id,
             tree: self,
         });
 
-        self.nodes.set(nodes);
+        // self.nodes.set(nodes);
         node
     }
 
@@ -264,7 +263,7 @@ impl<T: Debug> Tree<T> {
 
     pub fn append_children_from_another_tree(&self, id: &NodeId, tree: Tree<T>) {
         with_cell_mut!(self.nodes, nodes, {
-            let mut new_nodes = tree.nodes.take();
+            let mut new_nodes = tree.nodes.into_inner();
             assert!(
                 new_nodes.len() > 0,
                 "The tree should have at leaset one root node"
@@ -314,7 +313,7 @@ impl<T: Debug> Tree<T> {
             let mut first_valid_child = false;
 
             // Fix nodes's ref id.
-            for node in &mut new_nodes {
+            for node in new_nodes.iter_mut() {
                 node.parent = node.parent.and_then(|parent_id| match parent_id.value {
                     i if i < TRUE_ROOT_ID => None,
                     i if i == TRUE_ROOT_ID => Some(*id),
@@ -342,7 +341,7 @@ impl<T: Debug> Tree<T> {
 
     pub fn append_prev_siblings_from_another_tree(&self, id: &NodeId, tree: Tree<T>) {
         with_cell_mut!(self.nodes, nodes, {
-            let mut new_nodes = tree.nodes.take();
+            let mut new_nodes = tree.nodes.into_inner();
             assert!(
                 new_nodes.len() > 0,
                 "The tree should have at leaset one root node"
@@ -393,7 +392,7 @@ impl<T: Debug> Tree<T> {
             let mut last_valid_child = 0;
             let mut first_valid_child = true;
             // Fix nodes's ref id.
-            for node in &mut new_nodes {
+            for node in new_nodes.iter_mut() {
                 node.parent = node
                     .parent
                     .and_then(|old_parent_id| match old_parent_id.value {
@@ -518,7 +517,7 @@ impl<T: Debug> Tree<T> {
     pub fn debug_nodes(&self) {
         with_cell!(self.nodes, nodes, {
             println!("==============");
-            for node in &nodes {
+            for node in nodes.iter() {
                 println!("{:?}", node);
             }
 
@@ -534,9 +533,9 @@ impl<T: Debug> Tree<T> {
     where
         F: FnOnce(&InnerNode<T>) -> B,
     {
-        let nodes = self.nodes.take();
+        let nodes = self.nodes.borrow();
         let r = f(unsafe { nodes.get_unchecked(id.value) });
-        self.nodes.set(nodes);
+        // self.nodes.set(nodes);
         r
     }
 
@@ -544,9 +543,9 @@ impl<T: Debug> Tree<T> {
     where
         F: FnOnce(&mut InnerNode<T>) -> B,
     {
-        let mut nodes = self.nodes.take();
+        let mut nodes = self.nodes.borrow_mut();
         let r = f(unsafe { nodes.get_unchecked_mut(id.value) });
-        self.nodes.set(nodes);
+        // self.nodes.set(nodes);
         r
     }
 
@@ -554,12 +553,12 @@ impl<T: Debug> Tree<T> {
     where
         F: FnOnce(&InnerNode<T>, &InnerNode<T>) -> B,
     {
-        let nodes = self.nodes.take();
+        let nodes = self.nodes.borrow();
         let node_a = unsafe { nodes.get_unchecked(a.value) };
         let node_b = unsafe { nodes.get_unchecked(b.value) };
 
         let r = f(node_a, node_b);
-        self.nodes.set(nodes);
+        // self.nodes.set(nodes);
         r
     }
 }
@@ -830,10 +829,7 @@ impl<'a> Node<'a> {
                             .filter(|s| s.len() > 0)
                             .collect();
 
-                        let removes = class
-                            .split(" ")
-                            .map(|s| s.trim())
-                            .filter(|s| s.len() > 0);
+                        let removes = class.split(" ").map(|s| s.trim()).filter(|s| s.len() > 0);
 
                         for remove in removes {
                             set.remove(remove);
@@ -932,7 +928,7 @@ impl<'a> Node<'a> {
     pub fn text(&self) -> StrTendril {
         let mut ops = vec![self.id];
         let mut text = StrTendril::new();
-        let nodes = self.tree.nodes.take();
+        let nodes = self.tree.nodes.borrow();
         while !ops.is_empty() {
             let id = ops.remove(0);
             let node = unsafe { nodes.get_unchecked(id.value) };
@@ -949,7 +945,7 @@ impl<'a> Node<'a> {
             }
         }
 
-        self.tree.nodes.set(nodes);
+        // self.tree.nodes.set(nodes);
 
         text
     }
@@ -1038,7 +1034,7 @@ impl<'a> Serialize for SerializableNodeRef<'a> {
     where
         S: Serializer,
     {
-        let nodes = self.0.tree.nodes.take();
+        let nodes = self.0.tree.nodes.borrow();
         let id = self.0.id;
         let mut ops = match traversal_scope {
             IncludeNode => vec![SerializeOp::Open(id)],
@@ -1081,12 +1077,12 @@ impl<'a> Serialize for SerializableNodeRef<'a> {
                 },
                 SerializeOp::Close(name) => serializer.end_elem(name),
             } {
-                self.0.tree.nodes.set(nodes);
+                // self.0.tree.nodes.set(nodes);
                 return Err(e);
             }
         }
 
-        self.0.tree.nodes.set(nodes);
+        // self.0.tree.nodes.set(nodes);
         Ok(())
     }
 }
