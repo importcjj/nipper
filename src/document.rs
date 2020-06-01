@@ -18,7 +18,7 @@ use tendril::TendrilSink;
 /// Document represents an HTML document to be manipulated.
 pub struct Document {
     /// The document's dom tree.
-    pub tree: Tree<NodeData>,
+    pub(crate) tree: Tree<NodeData>,
 
     /// Errors that occurred during parsing.
     pub errors: Vec<Cow<'static, str>>,
