@@ -15,7 +15,8 @@ pub struct Matcher {
 }
 
 impl Matcher {
-    pub(crate) fn new(sel: &str) -> Result<Self, ParseError<SelectorParseErrorKind>> {
+    /// Greate a new CSS matcher.
+    pub fn new(sel: &str) -> Result<Self, ParseError<SelectorParseErrorKind>> {
         let mut input = cssparser::ParserInput::new(sel);
         let mut parser = cssparser::Parser::new(&mut input);
         selectors::parser::SelectorList::parse(&InnerSelectorParser, &mut parser)
