@@ -26,7 +26,7 @@
 //! ```
 //!
 
-#![deny(missing_docs)]
+// #![deny(missing_docs)] // TODO: add this back in.
 mod document;
 mod dom_tree;
 mod element;
@@ -41,6 +41,7 @@ pub use document::Document;
 pub use dom_tree::Node;
 #[doc(hidden)]
 pub use dom_tree::NodeId;
+pub use dom_tree::NodeRef;
 #[doc(hidden)]
 pub use dom_tree::SerializableNodeRef;
 pub use matcher::Matcher;
