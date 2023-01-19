@@ -1,5 +1,9 @@
+use crate::css::LocalNameCSS;
 use crate::dom_tree::{Node, NodeData};
 use crate::matcher::InnerSelector;
+
+use std::ops::Deref;
+
 use markup5ever::{namespace_url, ns};
 use selectors::attr::AttrSelectorOperation;
 use selectors::attr::CaseSensitivity;
@@ -8,7 +12,6 @@ use selectors::context::MatchingContext;
 use selectors::matching::ElementSelectorFlags;
 use selectors::parser::SelectorImpl;
 use selectors::OpaqueElement;
-use std::ops::Deref;
 
 impl<'a> selectors::Element for Node<'a> {
     type Impl = InnerSelector;
@@ -60,7 +63,7 @@ impl<'a> selectors::Element for Node<'a> {
     fn has_local_name(&self, local_name: &<Self::Impl as SelectorImpl>::BorrowedLocalName) -> bool {
         self.query(|node| {
             if let NodeData::Element(ref e) = node.data {
-                return &e.name.local == local_name;
+                return &e.name.local == local_name.deref();
             }
 
             false
@@ -102,7 +105,7 @@ impl<'a> selectors::Element for Node<'a> {
             if let NodeData::Element(ref e) = node.data {
                 return e.attrs.iter().any(|attr| match *ns {
                     NamespaceConstraint::Specific(url) if *url != attr.name.ns => false,
-                    _ => *local_name == attr.name.local && operation.eval_str(&attr.value),
+                    _ => *local_name.as_ref() == attr.name.local && operation.eval_str(&attr.value),
                 });
             }
 
@@ -165,7 +168,7 @@ impl<'a> selectors::Element for Node<'a> {
 
     fn has_class(
         &self,
-        name: &<Self::Impl as SelectorImpl>::ClassName,
+        name: &<Self::Impl as SelectorImpl>::LocalName,
         case_sensitivity: CaseSensitivity,
     ) -> bool {
         self.query(|node| {
@@ -183,23 +186,12 @@ impl<'a> selectors::Element for Node<'a> {
         })
     }
 
-    // Returns the mapping from the `exportparts` attribute in the regular direction, that is, inner-tree->outer-tree.
-    fn exported_part(
-        &self,
-        _name: &<Self::Impl as SelectorImpl>::PartName,
-    ) -> Option<<Self::Impl as SelectorImpl>::PartName> {
-        None
-    }
-
     // Returns the mapping from the `exportparts` attribute in the regular direction, that is, outer-tree->inner-tree.
-    fn imported_part(
-        &self,
-        _name: &<Self::Impl as SelectorImpl>::PartName,
-    ) -> Option<<Self::Impl as SelectorImpl>::PartName> {
+    fn imported_part(&self, _name: &LocalNameCSS) -> Option<LocalNameCSS> {
         None
     }
 
-    fn is_part(&self, _name: &<Self::Impl as SelectorImpl>::PartName) -> bool {
+    fn is_part(&self, _name: &LocalNameCSS) -> bool {
         false
     }
 

@@ -27,6 +27,7 @@
 //!
 
 // #![deny(missing_docs)] // TODO: add this back in.
+mod css;
 mod document;
 mod dom_tree;
 mod element;

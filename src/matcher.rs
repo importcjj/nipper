@@ -1,6 +1,9 @@
+use crate::css::{LocalNameCSS, StringCSS};
 use crate::dom_tree::{NodeData, NodeId, NodeRef};
+
 use cssparser::ParseError;
-use html5ever::{LocalName, Namespace};
+use cssparser::{self, ToCss};
+use html5ever::Namespace;
 use selectors::matching;
 use selectors::parser::{self, SelectorList, SelectorParseErrorKind};
 use selectors::visitor;
@@ -134,14 +137,12 @@ pub struct InnerSelector;
 
 impl parser::SelectorImpl for InnerSelector {
     type ExtraMatchingData = String;
-    type AttrValue = String;
-    type Identifier = LocalName;
-    type ClassName = LocalName;
-    type PartName = LocalName;
-    type LocalName = LocalName;
+    type AttrValue = StringCSS;
+    type Identifier = LocalNameCSS;
+    type LocalName = LocalNameCSS;
     type NamespaceUrl = Namespace;
-    type NamespacePrefix = LocalName;
-    type BorrowedLocalName = LocalName;
+    type NamespacePrefix = LocalNameCSS;
+    type BorrowedLocalName = LocalNameCSS;
     type BorrowedNamespaceUrl = Namespace;
 
     type NonTSPseudoClass = NonTSPseudoClass;
@@ -150,6 +151,15 @@ impl parser::SelectorImpl for InnerSelector {
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct NonTSPseudoClass;
+
+impl ToCss for NonTSPseudoClass {
+    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
+    where
+        W: fmt::Write,
+    {
+        dest.write_str("")
+    }
+}
 
 impl parser::NonTSPseudoClass for NonTSPseudoClass {
     type Impl = InnerSelector;
@@ -162,14 +172,6 @@ impl parser::NonTSPseudoClass for NonTSPseudoClass {
         false
     }
 
-    fn has_zero_specificity(&self) -> bool {
-        false
-    }
-}
-
-impl parser::Visit for NonTSPseudoClass {
-    type Impl = InnerSelector;
-
     fn visit<V>(&self, _visitor: &mut V) -> bool
     where
         V: visitor::SelectorVisitor<Impl = Self::Impl>,
@@ -178,7 +180,10 @@ impl parser::Visit for NonTSPseudoClass {
     }
 }
 
-impl cssparser::ToCss for NonTSPseudoClass {
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct PseudoElement;
+
+impl ToCss for PseudoElement {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
     where
         W: fmt::Write,
@@ -187,18 +192,14 @@ impl cssparser::ToCss for NonTSPseudoClass {
     }
 }
 
-#[derive(Clone, Eq, PartialEq)]
-pub struct PseudoElement;
-
 impl parser::PseudoElement for PseudoElement {
     type Impl = InnerSelector;
-}
 
-impl cssparser::ToCss for PseudoElement {
-    fn to_css<W>(&self, dest: &mut W) -> fmt::Result
-    where
-        W: fmt::Write,
-    {
-        dest.write_str("")
+    fn accepts_state_pseudo_classes(&self) -> bool {
+        false
+    }
+
+    fn valid_after_slotted(&self) -> bool {
+        false
     }
 }
