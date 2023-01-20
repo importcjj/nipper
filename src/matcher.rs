@@ -1,8 +1,8 @@
-use crate::css::{LocalNameCSS, StringCSS};
+use crate::css::{CssLocalName, CssString};
 use crate::dom_tree::{NodeData, NodeId, NodeRef};
 
 use cssparser::ParseError;
-use cssparser::{self, ToCss};
+use cssparser::{self, ToCss, SourceLocation, CowRcStr};
 use html5ever::Namespace;
 use selectors::matching;
 use selectors::parser::{self, SelectorList, SelectorParseErrorKind};
@@ -130,6 +130,43 @@ pub(crate) struct InnerSelectorParser;
 impl<'i> parser::Parser<'i> for InnerSelectorParser {
     type Impl = InnerSelector;
     type Error = parser::SelectorParseErrorKind<'i>;
+
+    fn parse_non_ts_pseudo_class(
+        &self,
+        location: SourceLocation,
+        name: CowRcStr<'i>,
+    ) -> Result<NonTSPseudoClass, ParseError<'i, Self::Error>> {
+
+        use self::NonTSPseudoClass::*;
+        if name.eq_ignore_ascii_case("any-link") {
+            Ok(AnyLink)
+        } else if name.eq_ignore_ascii_case("link") {
+            Ok(Link)
+        } else if name.eq_ignore_ascii_case("visited") {
+            Ok(Visited)
+        } else if name.eq_ignore_ascii_case("active") {
+            Ok(Active)
+        } else if name.eq_ignore_ascii_case("focus") {
+            Ok(Focus)
+        } else if name.eq_ignore_ascii_case("hover") {
+            Ok(Hover)
+        } else if name.eq_ignore_ascii_case("enabled") {
+            Ok(Enabled)
+        } else if name.eq_ignore_ascii_case("disabled") {
+            Ok(Disabled)
+        } else if name.eq_ignore_ascii_case("checked") {
+            Ok(Checked)
+        } else if name.eq_ignore_ascii_case("indeterminate") {
+            Ok(Indeterminate)
+        } else {
+            Err(
+                location.new_custom_error(SelectorParseErrorKind::UnsupportedPseudoClassOrElement(
+                    name,
+                )),
+            )
+        }
+
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -137,27 +174,51 @@ pub struct InnerSelector;
 
 impl parser::SelectorImpl for InnerSelector {
     type ExtraMatchingData = String;
-    type AttrValue = StringCSS;
-    type Identifier = LocalNameCSS;
-    type LocalName = LocalNameCSS;
+    type AttrValue = CssString;
+    type Identifier = CssLocalName;
+    type LocalName = CssLocalName;
     type NamespaceUrl = Namespace;
-    type NamespacePrefix = LocalNameCSS;
-    type BorrowedLocalName = LocalNameCSS;
+    type NamespacePrefix = CssLocalName;
+    type BorrowedLocalName = CssLocalName;
     type BorrowedNamespaceUrl = Namespace;
 
     type NonTSPseudoClass = NonTSPseudoClass;
     type PseudoElement = PseudoElement;
 }
 
-#[derive(Clone, Eq, PartialEq)]
-pub struct NonTSPseudoClass;
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum NonTSPseudoClass {
+    AnyLink,
+    Link,
+    Visited,
+    Active,
+    Focus,
+    Hover,
+    Enabled,
+    Disabled,
+    Checked,
+    Indeterminate,
+}
+
 
 impl ToCss for NonTSPseudoClass {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result
     where
         W: fmt::Write,
     {
-        dest.write_str("")
+        dest.write_str(match *self {
+            NonTSPseudoClass::AnyLink => ":any-link",
+            NonTSPseudoClass::Link => ":link",
+            NonTSPseudoClass::Visited => ":visited",
+            NonTSPseudoClass::Active => ":active",
+            NonTSPseudoClass::Focus => ":focus",
+            NonTSPseudoClass::Hover => ":hover",
+            NonTSPseudoClass::Enabled => ":enabled",
+            NonTSPseudoClass::Disabled => ":disabled",
+            NonTSPseudoClass::Checked => ":checked",
+            NonTSPseudoClass::Indeterminate => ":indeterminate",
+        })
     }
 }
 

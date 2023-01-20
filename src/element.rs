@@ -1,6 +1,6 @@
-use crate::css::LocalNameCSS;
+use crate::css::CssLocalName;
 use crate::dom_tree::{Node, NodeData};
-use crate::matcher::InnerSelector;
+use crate::matcher::{InnerSelector, NonTSPseudoClass};
 
 use std::ops::Deref;
 
@@ -115,14 +115,30 @@ impl<'a> selectors::Element for Node<'a> {
 
     fn match_non_ts_pseudo_class<F>(
         &self,
-        _pc: &<Self::Impl as SelectorImpl>::NonTSPseudoClass,
+        pseudo: &<Self::Impl as SelectorImpl>::NonTSPseudoClass,
         _context: &mut MatchingContext<Self::Impl>,
         _flags_setter: &mut F,
     ) -> bool
     where
         F: FnMut(&Self, ElementSelectorFlags),
     {
-        false
+
+        use self::NonTSPseudoClass::*;
+        match *pseudo {
+            Active | Focus | Hover | Enabled | Disabled | Checked | Indeterminate | Visited => {
+                false
+            }
+            AnyLink | Link => {
+                match self.node_name() {
+                    Some(node_name) => {
+                        matches!(node_name.deref(),"a" | "area" | "link")
+                        && self.attr("href").is_some()
+                    },
+                    None => false,
+                }
+                    
+            }
+        }
     }
 
     fn match_pseudo_element(
@@ -187,11 +203,11 @@ impl<'a> selectors::Element for Node<'a> {
     }
 
     // Returns the mapping from the `exportparts` attribute in the regular direction, that is, outer-tree->inner-tree.
-    fn imported_part(&self, _name: &LocalNameCSS) -> Option<LocalNameCSS> {
+    fn imported_part(&self, _name: &CssLocalName) -> Option<CssLocalName> {
         None
     }
 
-    fn is_part(&self, _name: &LocalNameCSS) -> bool {
+    fn is_part(&self, _name: &CssLocalName) -> bool {
         false
     }
 

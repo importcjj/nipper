@@ -27,6 +27,11 @@
 //!
 
 // #![deny(missing_docs)] // TODO: add this back in.
+#[macro_use]
+extern crate html5ever;
+#[macro_use]
+extern crate matches;
+
 mod css;
 mod document;
 mod dom_tree;
