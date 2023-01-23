@@ -1,11 +1,13 @@
 use crate::css::{CssLocalName, CssString};
 use crate::dom_tree::{NodeData, NodeId, NodeRef};
 
+use std::convert::Into;
+
 use cssparser::ParseError;
 use cssparser::{self, ToCss, SourceLocation, CowRcStr};
 use html5ever::Namespace;
-use selectors::matching;
-use selectors::parser::{self, SelectorList, SelectorParseErrorKind};
+use selectors::{matching, SelectorImpl};
+use selectors::parser::{self, SelectorList, SelectorParseErrorKind, Selector};
 use selectors::visitor;
 use selectors::Element;
 use std::collections::HashSet;
@@ -158,7 +160,7 @@ impl<'i> parser::Parser<'i> for InnerSelectorParser {
             Ok(Checked)
         } else if name.eq_ignore_ascii_case("indeterminate") {
             Ok(Indeterminate)
-        } else {
+        }else {
             Err(
                 location.new_custom_error(SelectorParseErrorKind::UnsupportedPseudoClassOrElement(
                     name,
@@ -167,9 +169,32 @@ impl<'i> parser::Parser<'i> for InnerSelectorParser {
         }
 
     }
+    fn parse_non_ts_functional_pseudo_class<'t>(
+        &self,
+        name: CowRcStr<'i>,
+        arguments: &mut cssparser::Parser<'i, 't>,
+    ) -> Result<NonTSPseudoClass, ParseError<'i, Self::Error>> {
+
+        if name.starts_with("has") {
+
+            let list:SelectorList<InnerSelector> = SelectorList::parse(
+                self,
+                arguments,
+            )?;
+            Ok(NonTSPseudoClass::Has(Box::new(list)))
+        }else {
+            Err(
+                arguments.new_custom_error(SelectorParseErrorKind::UnsupportedPseudoClassOrElement(
+                    name,
+                )),
+            )
+        }
+        
+    }
+
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InnerSelector;
 
 impl parser::SelectorImpl for InnerSelector {
@@ -199,6 +224,7 @@ pub enum NonTSPseudoClass {
     Disabled,
     Checked,
     Indeterminate,
+    Has(Box<SelectorList<InnerSelector>>),
 }
 
 
@@ -207,18 +233,25 @@ impl ToCss for NonTSPseudoClass {
     where
         W: fmt::Write,
     {
-        dest.write_str(match *self {
-            NonTSPseudoClass::AnyLink => ":any-link",
-            NonTSPseudoClass::Link => ":link",
-            NonTSPseudoClass::Visited => ":visited",
-            NonTSPseudoClass::Active => ":active",
-            NonTSPseudoClass::Focus => ":focus",
-            NonTSPseudoClass::Hover => ":hover",
-            NonTSPseudoClass::Enabled => ":enabled",
-            NonTSPseudoClass::Disabled => ":disabled",
-            NonTSPseudoClass::Checked => ":checked",
-            NonTSPseudoClass::Indeterminate => ":indeterminate",
-        })
+        println!("{:?}", self);
+        match self {
+            NonTSPseudoClass::AnyLink => dest.write_str(":any-link"),
+            NonTSPseudoClass::Link => dest.write_str(":link"),
+            NonTSPseudoClass::Visited => dest.write_str(":visited"),
+            NonTSPseudoClass::Active => dest.write_str(":active"),
+            NonTSPseudoClass::Focus => dest.write_str(":focus"),
+            NonTSPseudoClass::Hover => dest.write_str(":hover"),
+            NonTSPseudoClass::Enabled => dest.write_str(":enabled"),
+            NonTSPseudoClass::Disabled => dest.write_str(":disabled"),
+            NonTSPseudoClass::Checked => dest.write_str(":checked"),
+            NonTSPseudoClass::Indeterminate => dest.write_str(":indeterminate"),
+            NonTSPseudoClass::Has(list) => {
+                println!("{}", list.to_css_string());
+                dest.write_str("has:(")?;
+                list.to_css(dest)?;
+                dest.write_str(")")
+            }
+        }
     }
 }
 

@@ -1,17 +1,18 @@
 use crate::css::CssLocalName;
-use crate::dom_tree::{Node, NodeData};
+use crate::dom_tree::{Node, NodeData, NodeRef};
 use crate::matcher::{InnerSelector, NonTSPseudoClass};
 
 use std::ops::Deref;
 
+use cssparser::ToCss;
 use markup5ever::{namespace_url, ns};
 use selectors::attr::AttrSelectorOperation;
 use selectors::attr::CaseSensitivity;
 use selectors::attr::NamespaceConstraint;
 use selectors::context::MatchingContext;
-use selectors::matching::ElementSelectorFlags;
+use selectors::matching::{ElementSelectorFlags, matches_selector_list};
 use selectors::parser::SelectorImpl;
-use selectors::OpaqueElement;
+use selectors::{OpaqueElement, SelectorList, Element};
 
 impl<'a> selectors::Element for Node<'a> {
     type Impl = InnerSelector;
@@ -116,7 +117,7 @@ impl<'a> selectors::Element for Node<'a> {
     fn match_non_ts_pseudo_class<F>(
         &self,
         pseudo: &<Self::Impl as SelectorImpl>::NonTSPseudoClass,
-        _context: &mut MatchingContext<Self::Impl>,
+        context: &mut MatchingContext<Self::Impl>,
         _flags_setter: &mut F,
     ) -> bool
     where
@@ -124,7 +125,7 @@ impl<'a> selectors::Element for Node<'a> {
     {
 
         use self::NonTSPseudoClass::*;
-        match *pseudo {
+        match pseudo {
             Active | Focus | Hover | Enabled | Disabled | Checked | Indeterminate | Visited => {
                 false
             }
@@ -136,7 +137,13 @@ impl<'a> selectors::Element for Node<'a> {
                     },
                     None => false,
                 }
-                    
+                  
+            },
+            Has(list) => {
+                //it checks only in self, not in inlines!
+                has_descendant_match(self, list, context)
+                
+                //true
             }
         }
     }
@@ -223,4 +230,19 @@ impl<'a> selectors::Element for Node<'a> {
     fn is_root(&self) -> bool {
         self.is_document()
     }
+}
+
+
+fn has_descendant_match(n: &NodeRef<NodeData>, selectors_list: &Box<SelectorList<InnerSelector>>, ctx: &mut MatchingContext<InnerSelector>) -> bool {
+    let mut  node = n.first_child();
+    while let Some(ref n) = node {
+
+        if matches_selector_list(&selectors_list, n,  ctx)  {
+            return true;
+        } else if n.is_element() && has_descendant_match(n, selectors_list, ctx) {
+            return true;
+        }
+        node = n.next_sibling();
+    }
+    false
 }
