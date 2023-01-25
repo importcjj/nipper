@@ -218,7 +218,6 @@ impl ToCss for NonTSPseudoClass {
     where
         W: fmt::Write,
     {
-        println!("{:?}", self);
         match self {
             NonTSPseudoClass::AnyLink => dest.write_str(":any-link"),
             NonTSPseudoClass::Link => dest.write_str(":link"),
@@ -231,7 +230,6 @@ impl ToCss for NonTSPseudoClass {
             NonTSPseudoClass::Checked => dest.write_str(":checked"),
             NonTSPseudoClass::Indeterminate => dest.write_str(":indeterminate"),
             NonTSPseudoClass::Has(list) => {
-                println!("{}", list.to_css_string());
                 dest.write_str("has:(")?;
                 list.to_css(dest)?;
                 dest.write_str(")")
