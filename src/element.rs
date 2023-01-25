@@ -11,7 +11,7 @@ use selectors::attr::NamespaceConstraint;
 use selectors::context::MatchingContext;
 use selectors::matching::{matches_selector_list, ElementSelectorFlags};
 use selectors::parser::SelectorImpl;
-use selectors::{ OpaqueElement, SelectorList};
+use selectors::{OpaqueElement, SelectorList};
 
 impl<'a> selectors::Element for Node<'a> {
     type Impl = InnerSelector;
@@ -234,8 +234,9 @@ fn has_descendant_match(
 ) -> bool {
     let mut node = n.first_child();
     while let Some(ref n) = node {
-        if matches_selector_list(&selectors_list, n, ctx) 
-        || (n.is_element() && has_descendant_match(n, selectors_list, ctx)) {
+        if matches_selector_list(selectors_list, n, ctx)
+            || (n.is_element() && has_descendant_match(n, selectors_list, ctx))
+        {
             return true;
         }
         node = n.next_sibling();

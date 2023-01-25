@@ -18,7 +18,7 @@ impl Deref for CssString {
 
 impl AsRef<str> for CssString {
     fn as_ref(&self) -> &str {
-         &self.0
+        &self.0
     }
 }
 

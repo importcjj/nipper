@@ -1,15 +1,13 @@
 use crate::css::{CssLocalName, CssString};
 use crate::dom_tree::{NodeData, NodeId, NodeRef};
 
-use std::convert::Into;
-
 use cssparser::ParseError;
 use cssparser::{self, CowRcStr, SourceLocation, ToCss};
 use html5ever::Namespace;
+use selectors::matching;
 use selectors::parser::{self, SelectorList, SelectorParseErrorKind};
 use selectors::visitor;
 use selectors::Element;
-use selectors::{matching};
 use std::collections::HashSet;
 use std::fmt;
 
@@ -64,7 +62,7 @@ impl<T> Matches<T> {
         Self {
             roots: vec![node],
             nodes: vec![],
-            matcher: matcher,
+            matcher,
             set: HashSet::new(),
             match_scope,
         }
@@ -78,7 +76,7 @@ impl<T> Matches<T> {
         Self {
             roots: nodes.collect(),
             nodes: vec![],
-            matcher: matcher,
+            matcher,
             set: HashSet::new(),
             match_scope,
         }
