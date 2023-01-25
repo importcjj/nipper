@@ -4,12 +4,12 @@ use crate::dom_tree::{NodeData, NodeId, NodeRef};
 use std::convert::Into;
 
 use cssparser::ParseError;
-use cssparser::{self, ToCss, SourceLocation, CowRcStr};
+use cssparser::{self, CowRcStr, SourceLocation, ToCss};
 use html5ever::Namespace;
-use selectors::{matching, SelectorImpl};
-use selectors::parser::{self, SelectorList, SelectorParseErrorKind, Selector};
+use selectors::parser::{self, Selector, SelectorList, SelectorParseErrorKind};
 use selectors::visitor;
 use selectors::Element;
+use selectors::{matching, SelectorImpl};
 use std::collections::HashSet;
 use std::fmt;
 
@@ -138,7 +138,6 @@ impl<'i> parser::Parser<'i> for InnerSelectorParser {
         location: SourceLocation,
         name: CowRcStr<'i>,
     ) -> Result<NonTSPseudoClass, ParseError<'i, Self::Error>> {
-
         use self::NonTSPseudoClass::*;
         if name.eq_ignore_ascii_case("any-link") {
             Ok(AnyLink)
@@ -160,38 +159,28 @@ impl<'i> parser::Parser<'i> for InnerSelectorParser {
             Ok(Checked)
         } else if name.eq_ignore_ascii_case("indeterminate") {
             Ok(Indeterminate)
-        }else {
+        } else {
             Err(
                 location.new_custom_error(SelectorParseErrorKind::UnsupportedPseudoClassOrElement(
                     name,
                 )),
             )
         }
-
     }
     fn parse_non_ts_functional_pseudo_class<'t>(
         &self,
         name: CowRcStr<'i>,
         arguments: &mut cssparser::Parser<'i, 't>,
     ) -> Result<NonTSPseudoClass, ParseError<'i, Self::Error>> {
-
         if name.starts_with("has") {
-
-            let list:SelectorList<InnerSelector> = SelectorList::parse(
-                self,
-                arguments,
-            )?;
-            Ok(NonTSPseudoClass::Has(Box::new(list)))
-        }else {
-            Err(
-                arguments.new_custom_error(SelectorParseErrorKind::UnsupportedPseudoClassOrElement(
-                    name,
-                )),
-            )
+            let list: SelectorList<InnerSelector> = SelectorList::parse(self, arguments)?;
+            Ok(NonTSPseudoClass::Has(list))
+        } else {
+            Err(arguments.new_custom_error(
+                SelectorParseErrorKind::UnsupportedPseudoClassOrElement(name),
+            ))
         }
-        
     }
-
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -211,7 +200,6 @@ impl parser::SelectorImpl for InnerSelector {
     type PseudoElement = PseudoElement;
 }
 
-
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum NonTSPseudoClass {
     AnyLink,
@@ -224,9 +212,8 @@ pub enum NonTSPseudoClass {
     Disabled,
     Checked,
     Indeterminate,
-    Has(Box<SelectorList<InnerSelector>>),
+    Has(SelectorList<InnerSelector>),
 }
-
 
 impl ToCss for NonTSPseudoClass {
     fn to_css<W>(&self, dest: &mut W) -> fmt::Result

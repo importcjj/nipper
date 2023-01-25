@@ -10,9 +10,9 @@ use selectors::attr::AttrSelectorOperation;
 use selectors::attr::CaseSensitivity;
 use selectors::attr::NamespaceConstraint;
 use selectors::context::MatchingContext;
-use selectors::matching::{ElementSelectorFlags, matches_selector_list};
+use selectors::matching::{matches_selector_list, ElementSelectorFlags};
 use selectors::parser::SelectorImpl;
-use selectors::{OpaqueElement, SelectorList, Element};
+use selectors::{Element, OpaqueElement, SelectorList};
 
 impl<'a> selectors::Element for Node<'a> {
     type Impl = InnerSelector;
@@ -123,26 +123,22 @@ impl<'a> selectors::Element for Node<'a> {
     where
         F: FnMut(&Self, ElementSelectorFlags),
     {
-
         use self::NonTSPseudoClass::*;
         match pseudo {
             Active | Focus | Hover | Enabled | Disabled | Checked | Indeterminate | Visited => {
                 false
             }
-            AnyLink | Link => {
-                match self.node_name() {
-                    Some(node_name) => {
-                        matches!(node_name.deref(),"a" | "area" | "link")
+            AnyLink | Link => match self.node_name() {
+                Some(node_name) => {
+                    matches!(node_name.deref(), "a" | "area" | "link")
                         && self.attr("href").is_some()
-                    },
-                    None => false,
                 }
-                  
+                None => false,
             },
             Has(list) => {
                 //it checks only in self, not in inlines!
                 has_descendant_match(self, list, context)
-                
+
                 //true
             }
         }
@@ -232,14 +228,15 @@ impl<'a> selectors::Element for Node<'a> {
     }
 }
 
-
-fn has_descendant_match(n: &NodeRef<NodeData>, selectors_list: &Box<SelectorList<InnerSelector>>, ctx: &mut MatchingContext<InnerSelector>) -> bool {
-    let mut  node = n.first_child();
+fn has_descendant_match(
+    n: &NodeRef<NodeData>,
+    selectors_list: &SelectorList<InnerSelector>,
+    ctx: &mut MatchingContext<InnerSelector>,
+) -> bool {
+    let mut node = n.first_child();
     while let Some(ref n) = node {
-
-        if matches_selector_list(&selectors_list, n,  ctx)  {
-            return true;
-        } else if n.is_element() && has_descendant_match(n, selectors_list, ctx) {
+        if matches_selector_list(&selectors_list, n, ctx) 
+        || (n.is_element() && has_descendant_match(n, selectors_list, ctx)) {
             return true;
         }
         node = n.next_sibling();

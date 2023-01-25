@@ -2,7 +2,7 @@ use std::convert::AsRef;
 use std::fmt;
 use std::ops::Deref;
 
-use cssparser::{self, ToCss, serialize_string};
+use cssparser::{self, serialize_string, ToCss};
 use html5ever::LocalName;
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -63,4 +63,3 @@ impl Deref for CssLocalName {
         &self.0
     }
 }
-
