@@ -6,10 +6,10 @@ use std::convert::Into;
 use cssparser::ParseError;
 use cssparser::{self, CowRcStr, SourceLocation, ToCss};
 use html5ever::Namespace;
-use selectors::parser::{self, Selector, SelectorList, SelectorParseErrorKind};
+use selectors::parser::{self, SelectorList, SelectorParseErrorKind};
 use selectors::visitor;
 use selectors::Element;
-use selectors::{matching, SelectorImpl};
+use selectors::{matching};
 use std::collections::HashSet;
 use std::fmt;
 

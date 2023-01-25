@@ -4,7 +4,6 @@ use crate::matcher::{InnerSelector, NonTSPseudoClass};
 
 use std::ops::Deref;
 
-use cssparser::ToCss;
 use markup5ever::{namespace_url, ns};
 use selectors::attr::AttrSelectorOperation;
 use selectors::attr::CaseSensitivity;
@@ -12,7 +11,7 @@ use selectors::attr::NamespaceConstraint;
 use selectors::context::MatchingContext;
 use selectors::matching::{matches_selector_list, ElementSelectorFlags};
 use selectors::parser::SelectorImpl;
-use selectors::{Element, OpaqueElement, SelectorList};
+use selectors::{ OpaqueElement, SelectorList};
 
 impl<'a> selectors::Element for Node<'a> {
     type Impl = InnerSelector;
