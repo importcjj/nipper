@@ -24,7 +24,7 @@ impl AsRef<str> for CssString {
 
 impl From<&str> for CssString {
     fn from(value: &str) -> Self {
-        CssString(value.to_owned()
+        CssString(value.to_owned())
     }
 }
 
