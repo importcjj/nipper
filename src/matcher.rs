@@ -8,8 +8,12 @@ use selectors::matching;
 use selectors::parser::{self, SelectorList, SelectorParseErrorKind};
 use selectors::visitor;
 use selectors::Element;
-use std::collections::HashSet;
 use std::fmt;
+
+use fxhash::FxBuildHasher;
+use indexmap::IndexSet;
+
+pub type NodeIdSet = IndexSet<NodeId, FxBuildHasher>;
 
 /// CSS selector.
 #[derive(Clone, Debug)]
@@ -46,7 +50,7 @@ pub struct Matches<T> {
     roots: Vec<T>,
     nodes: Vec<T>,
     matcher: Matcher,
-    set: HashSet<NodeId>,
+    set: NodeIdSet,
     match_scope: MatchScope,
 }
 
@@ -63,7 +67,7 @@ impl<T> Matches<T> {
             roots: vec![node],
             nodes: vec![],
             matcher,
-            set: HashSet::new(),
+            set: NodeIdSet::default(),
             match_scope,
         }
     }
@@ -77,7 +81,7 @@ impl<T> Matches<T> {
             roots: nodes.collect(),
             nodes: vec![],
             matcher,
-            set: HashSet::new(),
+            set: NodeIdSet::default(),
             match_scope,
         }
     }
