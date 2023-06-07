@@ -41,6 +41,8 @@ pub use document::Document;
 pub use dom_tree::Node;
 #[doc(hidden)]
 pub use dom_tree::NodeId;
+#[doc(hidden)]
+pub use dom_tree::NodeData;
 pub use dom_tree::NodeRef;
 #[doc(hidden)]
 pub use dom_tree::SerializableNodeRef;
