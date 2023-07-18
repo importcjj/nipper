@@ -602,6 +602,13 @@ impl<T: Debug> Debug for InnerNode<T> {
 }
 
 impl InnerNode<NodeData> {
+    pub fn is_comment(&self) -> bool {
+        match self.data {
+            NodeData::Comment { .. } => true,
+            _ => false,
+        }
+    }
+
     pub fn is_document(&self) -> bool {
         match self.data {
             NodeData::Document => true,
