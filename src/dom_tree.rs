@@ -296,7 +296,7 @@ impl<T: Debug> Tree<T> {
             let last_child_id = fix_id!(root.last_child);
 
             // Update new parent's first and last child id.
-            let mut parent = get_node_unchecked_mut!(nodes, id);
+            let parent = get_node_unchecked_mut!(nodes, id);
             if parent.first_child.is_none() {
                 parent.first_child = first_child_id;
             }
@@ -306,7 +306,7 @@ impl<T: Debug> Tree<T> {
 
             // Update next_sibling_id
             if let Some(last_child_id) = parent_last_child_id {
-                let mut last_child = get_node_unchecked_mut!(nodes, last_child_id);
+                let last_child = get_node_unchecked_mut!(nodes, last_child_id);
                 last_child.next_sibling = first_child_id;
             }
 
@@ -371,7 +371,7 @@ impl<T: Debug> Tree<T> {
             let first_child_id = fix_id!(root.first_child);
             let last_child_id = fix_id!(root.last_child);
 
-            let mut node = get_node_unchecked_mut!(nodes, id);
+            let node = get_node_unchecked_mut!(nodes, id);
             let prev_sibling_id = node.prev_sibling;
             let parent_id = node.parent;
 
@@ -380,11 +380,11 @@ impl<T: Debug> Tree<T> {
 
             // Update prev sibling's next sibling
             if let Some(prev_sibling_id) = prev_sibling_id {
-                let mut prev_sibling = get_node_unchecked_mut!(nodes, prev_sibling_id);
+                let prev_sibling = get_node_unchecked_mut!(nodes, prev_sibling_id);
                 prev_sibling.next_sibling = first_child_id;
             // Update parent's first child.
             } else if let Some(parent_id) = parent_id {
-                let mut parent = get_node_unchecked_mut!(nodes, parent_id);
+                let parent = get_node_unchecked_mut!(nodes, parent_id);
                 parent.first_child = first_child_id;
             }
 
@@ -499,7 +499,7 @@ impl<T: Debug> Tree<T> {
             node.last_child = None;
 
             if let Some(new_parent_id) = new_parent_id {
-                let mut new_parent = get_node_unchecked_mut!(nodes, new_parent_id);
+                let new_parent = get_node_unchecked_mut!(nodes, new_parent_id);
                 new_parent.first_child = first_child_id;
                 new_parent.last_child = last_child_id;
             }
