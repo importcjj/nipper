@@ -92,7 +92,7 @@ impl TreeSink for Document {
             NodeData::Element(Element {
                 template_contents: Some(ref contents),
                 ..
-            }) => contents.clone(),
+            }) => *contents,
             _ => panic!("not a template element!"),
         })
     }
@@ -151,7 +151,7 @@ impl TreeSink for Document {
     // Create a Processing Instruction node.
     fn create_pi(&mut self, target: StrTendril, data: StrTendril) -> NodeId {
         self.tree.create_node(NodeData::ProcessingInstruction {
-            target: target,
+            target,
             contents: data,
         })
     }
@@ -243,9 +243,9 @@ impl TreeSink for Document {
         self.tree.append_child_data_of(
             &root,
             NodeData::Doctype {
-                name: name,
-                public_id: public_id,
-                system_id: system_id,
+                name,
+                public_id,
+                system_id,
             },
         );
     }

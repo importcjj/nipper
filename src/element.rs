@@ -1,14 +1,17 @@
-use crate::dom_tree::{Node, NodeData};
-use crate::matcher::InnerSelector;
+use crate::css::CssLocalName;
+use crate::dom_tree::{Node, NodeData, NodeRef};
+use crate::matcher::{InnerSelector, NonTSPseudoClass};
+
+use std::ops::Deref;
+
 use markup5ever::{namespace_url, ns};
 use selectors::attr::AttrSelectorOperation;
 use selectors::attr::CaseSensitivity;
 use selectors::attr::NamespaceConstraint;
 use selectors::context::MatchingContext;
-use selectors::matching::ElementSelectorFlags;
+use selectors::matching::{matches_selector_list, ElementSelectorFlags};
 use selectors::parser::SelectorImpl;
-use selectors::OpaqueElement;
-use std::ops::Deref;
+use selectors::{OpaqueElement, SelectorList};
 
 impl<'a> selectors::Element for Node<'a> {
     type Impl = InnerSelector;
@@ -60,7 +63,7 @@ impl<'a> selectors::Element for Node<'a> {
     fn has_local_name(&self, local_name: &<Self::Impl as SelectorImpl>::BorrowedLocalName) -> bool {
         self.query(|node| {
             if let NodeData::Element(ref e) = node.data {
-                return &e.name.local == local_name;
+                return &e.name.local == local_name.deref();
             }
 
             false
@@ -102,7 +105,7 @@ impl<'a> selectors::Element for Node<'a> {
             if let NodeData::Element(ref e) = node.data {
                 return e.attrs.iter().any(|attr| match *ns {
                     NamespaceConstraint::Specific(url) if *url != attr.name.ns => false,
-                    _ => *local_name == attr.name.local && operation.eval_str(&attr.value),
+                    _ => *local_name.as_ref() == attr.name.local && operation.eval_str(&attr.value),
                 });
             }
 
@@ -110,16 +113,30 @@ impl<'a> selectors::Element for Node<'a> {
         })
     }
 
-    fn match_non_ts_pseudo_class<F>(
+    fn match_non_ts_pseudo_class(
         &self,
-        _pc: &<Self::Impl as SelectorImpl>::NonTSPseudoClass,
-        _context: &mut MatchingContext<Self::Impl>,
-        _flags_setter: &mut F,
-    ) -> bool
-    where
-        F: FnMut(&Self, ElementSelectorFlags),
-    {
-        false
+        pseudo: &<Self::Impl as SelectorImpl>::NonTSPseudoClass,
+        context: &mut MatchingContext<Self::Impl>,
+    ) -> bool {
+        use self::NonTSPseudoClass::*;
+        match pseudo {
+            Active | Focus | Hover | Enabled | Disabled | Checked | Indeterminate | Visited => {
+                false
+            }
+            AnyLink | Link => match self.node_name() {
+                Some(node_name) => {
+                    matches!(node_name.deref(), "a" | "area" | "link")
+                        && self.attr("href").is_some()
+                }
+                None => false,
+            },
+            Has(list) => {
+                //it checks only in self, not in inlines!
+                has_descendant_match(self, list, context)
+
+                //true
+            }
+        }
     }
 
     fn match_pseudo_element(
@@ -165,7 +182,7 @@ impl<'a> selectors::Element for Node<'a> {
 
     fn has_class(
         &self,
-        name: &<Self::Impl as SelectorImpl>::ClassName,
+        name: &<Self::Impl as SelectorImpl>::LocalName,
         case_sensitivity: CaseSensitivity,
     ) -> bool {
         self.query(|node| {
@@ -183,23 +200,12 @@ impl<'a> selectors::Element for Node<'a> {
         })
     }
 
-    // Returns the mapping from the `exportparts` attribute in the regular direction, that is, inner-tree->outer-tree.
-    fn exported_part(
-        &self,
-        _name: &<Self::Impl as SelectorImpl>::PartName,
-    ) -> Option<<Self::Impl as SelectorImpl>::PartName> {
-        None
-    }
-
     // Returns the mapping from the `exportparts` attribute in the regular direction, that is, outer-tree->inner-tree.
-    fn imported_part(
-        &self,
-        _name: &<Self::Impl as SelectorImpl>::PartName,
-    ) -> Option<<Self::Impl as SelectorImpl>::PartName> {
+    fn imported_part(&self, _name: &CssLocalName) -> Option<CssLocalName> {
         None
     }
 
-    fn is_part(&self, _name: &<Self::Impl as SelectorImpl>::PartName) -> bool {
+    fn is_part(&self, _name: &CssLocalName) -> bool {
         false
     }
 
@@ -215,4 +221,30 @@ impl<'a> selectors::Element for Node<'a> {
     fn is_root(&self) -> bool {
         self.is_document()
     }
+
+    fn first_element_child(&self) -> Option<Self> {
+        self.children()
+            .iter()
+            .find(|&child| child.is_element())
+            .cloned()
+    }
+
+    fn apply_selector_flags(&self, _flags: ElementSelectorFlags) {}
+}
+
+fn has_descendant_match(
+    n: &NodeRef<NodeData>,
+    selectors_list: &SelectorList<InnerSelector>,
+    ctx: &mut MatchingContext<InnerSelector>,
+) -> bool {
+    let mut node = n.first_child();
+    while let Some(ref n) = node {
+        if matches_selector_list(selectors_list, n, ctx)
+            || (n.is_element() && has_descendant_match(n, selectors_list, ctx))
+        {
+            return true;
+        }
+        node = n.next_sibling();
+    }
+    false
 }

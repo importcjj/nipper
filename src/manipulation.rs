@@ -62,16 +62,14 @@ impl<'a> Selection<'a> {
         T: Into<StrTendril>,
     {
         let dom = parse_html!(html);
-        let mut i = 0;
 
-        for node in self.nodes() {
+        for (i, node) in self.nodes().iter().enumerate() {
             if i + 1 == self.size() {
                 node.append_prev_siblings_from_another_tree(dom.tree);
                 break;
             } else {
                 node.append_prev_siblings_from_another_tree(dom.tree.clone());
             }
-            i += 1;
         }
 
         self.remove()
@@ -97,16 +95,14 @@ impl<'a> Selection<'a> {
         T: Into<StrTendril>,
     {
         let dom = parse_html!(html);
-        let mut i = 0;
 
-        for node in self.nodes() {
+        for (i, node) in self.nodes().iter().enumerate() {
             if i + 1 == self.size() {
                 node.append_children_from_another_tree(dom.tree);
                 break;
             } else {
                 node.append_children_from_another_tree(dom.tree.clone());
             }
-            i += 1;
         }
     }
 

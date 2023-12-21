@@ -16,7 +16,7 @@ impl Document {
         let matcher = Matcher::new(sel).expect("Invalid CSS selector");
         let root = self.tree.root();
         Selection {
-            nodes: Matches::from_one(root, matcher.clone(), MatchScope::IncludeNode).collect(),
+            nodes: Matches::from_one(root, matcher, MatchScope::IncludeNode).collect(),
         }
     }
 
@@ -37,8 +37,8 @@ impl Document {
             Ok(matcher) => {
                 let root = self.tree.root();
                 let nodes: Vec<Node> =
-                    Matches::from_one(root, matcher.clone(), MatchScope::ChildrenOnly).collect();
-                if nodes.len() > 0 {
+                    Matches::from_one(root, matcher, MatchScope::ChildrenOnly).collect();
+                if !nodes.is_empty() {
                     Some(Selection { nodes })
                 } else {
                     None
@@ -101,7 +101,7 @@ impl<'a> Selection<'a> {
                     MatchScope::ChildrenOnly,
                 )
                 .collect();
-                if nodes.len() > 0 {
+                if !nodes.is_empty() {
                     Some(Selection { nodes })
                 } else {
                     None

@@ -21,7 +21,7 @@ impl<'a> Selection<'a> {
         if self.length() > 0 {
             return self
                 .nodes()
-                .into_iter()
+                .iter()
                 .filter(|node| matcher.match_element(*node))
                 .count()
                 > 0;

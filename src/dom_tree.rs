@@ -265,7 +265,7 @@ impl<T: Debug> Tree<T> {
         with_cell_mut!(self.nodes, nodes, {
             let mut new_nodes = tree.nodes.into_inner();
             assert!(
-                new_nodes.len() > 0,
+                !new_nodes.is_empty(),
                 "The tree should have at leaset one root node"
             );
             assert!(
@@ -296,7 +296,7 @@ impl<T: Debug> Tree<T> {
             let last_child_id = fix_id!(root.last_child);
 
             // Update new parent's first and last child id.
-            let mut parent = get_node_unchecked_mut!(nodes, id);
+            let parent = get_node_unchecked_mut!(nodes, id);
             if parent.first_child.is_none() {
                 parent.first_child = first_child_id;
             }
@@ -306,7 +306,7 @@ impl<T: Debug> Tree<T> {
 
             // Update next_sibling_id
             if let Some(last_child_id) = parent_last_child_id {
-                let mut last_child = get_node_unchecked_mut!(nodes, last_child_id);
+                let last_child = get_node_unchecked_mut!(nodes, last_child_id);
                 last_child.next_sibling = first_child_id;
             }
 
@@ -317,7 +317,7 @@ impl<T: Debug> Tree<T> {
                 node.parent = node.parent.and_then(|parent_id| match parent_id.value {
                     i if i < TRUE_ROOT_ID => None,
                     i if i == TRUE_ROOT_ID => Some(*id),
-                    i @ _ => fix_id!(Some(NodeId::new(i))),
+                    i => fix_id!(Some(NodeId::new(i))),
                 });
 
                 // Update prev_sibling_id
@@ -343,7 +343,7 @@ impl<T: Debug> Tree<T> {
         with_cell_mut!(self.nodes, nodes, {
             let mut new_nodes = tree.nodes.into_inner();
             assert!(
-                new_nodes.len() > 0,
+                !new_nodes.is_empty(),
                 "The tree should have at leaset one root node"
             );
             assert!(
@@ -371,7 +371,7 @@ impl<T: Debug> Tree<T> {
             let first_child_id = fix_id!(root.first_child);
             let last_child_id = fix_id!(root.last_child);
 
-            let mut node = get_node_unchecked_mut!(nodes, id);
+            let node = get_node_unchecked_mut!(nodes, id);
             let prev_sibling_id = node.prev_sibling;
             let parent_id = node.parent;
 
@@ -380,25 +380,24 @@ impl<T: Debug> Tree<T> {
 
             // Update prev sibling's next sibling
             if let Some(prev_sibling_id) = prev_sibling_id {
-                let mut prev_sibling = get_node_unchecked_mut!(nodes, prev_sibling_id);
+                let prev_sibling = get_node_unchecked_mut!(nodes, prev_sibling_id);
                 prev_sibling.next_sibling = first_child_id;
             // Update parent's first child.
             } else if let Some(parent_id) = parent_id {
-                let mut parent = get_node_unchecked_mut!(nodes, parent_id);
+                let parent = get_node_unchecked_mut!(nodes, parent_id);
                 parent.first_child = first_child_id;
             }
 
-            let mut i = 0;
             let mut last_valid_child = 0;
             let mut first_valid_child = true;
             // Fix nodes's ref id.
-            for node in new_nodes.iter_mut() {
+            for (i, node) in new_nodes.iter_mut().enumerate() {
                 node.parent = node
                     .parent
                     .and_then(|old_parent_id| match old_parent_id.value {
                         i if i < TRUE_ROOT_ID => None,
                         i if i == TRUE_ROOT_ID => parent_id,
-                        i @ _ => fix_id!(Some(NodeId::new(i))),
+                        i => fix_id!(Some(NodeId::new(i))),
                     });
 
                 // Update first child's prev_sibling
@@ -416,11 +415,10 @@ impl<T: Debug> Tree<T> {
                 node.last_child = fix_id!(node.last_child);
                 node.prev_sibling = fix_id!(node.prev_sibling);
                 node.next_sibling = fix_id!(node.next_sibling);
-                i += 1;
             }
 
             // Update last child's next_sibling.
-            new_nodes[last_valid_child as usize].next_sibling = Some(*id);
+            new_nodes[last_valid_child].next_sibling = Some(*id);
 
             // Put all the new nodes except the root node into the nodes.
             nodes.extend(new_nodes);
@@ -501,7 +499,7 @@ impl<T: Debug> Tree<T> {
             node.last_child = None;
 
             if let Some(new_parent_id) = new_parent_id {
-                let mut new_parent = get_node_unchecked_mut!(nodes, new_parent_id);
+                let new_parent = get_node_unchecked_mut!(nodes, new_parent_id);
                 new_parent.first_child = first_child_id;
                 new_parent.last_child = last_child_id;
             }
@@ -557,9 +555,8 @@ impl<T: Debug> Tree<T> {
         let node_a = unsafe { nodes.get_unchecked(a.value) };
         let node_b = unsafe { nodes.get_unchecked(b.value) };
 
-        let r = f(node_a, node_b);
         // self.nodes.set(nodes);
-        r
+        f(node_a, node_b)
     }
 }
 
@@ -603,36 +600,27 @@ impl<T: Debug> Debug for InnerNode<T> {
 
 impl InnerNode<NodeData> {
     pub fn is_document(&self) -> bool {
-        match self.data {
-            NodeData::Document => true,
-            _ => false,
-        }
+        matches!(self.data, NodeData::Document)
     }
 
     pub fn is_element(&self) -> bool {
-        match self.data {
-            NodeData::Element(_) => true,
-            _ => false,
-        }
+        matches!(self.data, NodeData::Element(_))
     }
 
     pub fn is_text(&self) -> bool {
-        match self.data {
-            NodeData::Text { .. } => true,
-            _ => false,
-        }
+        matches!(self.data, NodeData::Text { .. })
     }
 }
 
 impl<T: Clone> Clone for InnerNode<T> {
     fn clone(&self) -> Self {
         Self {
-            id: self.id.clone(),
-            parent: self.parent.clone(),
-            prev_sibling: self.prev_sibling.clone(),
-            next_sibling: self.next_sibling.clone(),
-            first_child: self.first_child.clone(),
-            last_child: self.last_child.clone(),
+            id: self.id,
+            parent: self.parent,
+            prev_sibling: self.prev_sibling,
+            next_sibling: self.next_sibling,
+            first_child: self.first_child,
+            last_child: self.last_child,
             data: self.data.clone(),
         }
     }
@@ -775,18 +763,18 @@ impl<'a> Node<'a> {
     }
 
     pub fn add_class(&self, class: &str) {
-        if class.trim().len() == 0 {
+        if class.trim().is_empty() {
             return;
         }
 
-        self.update(|node| match node.data {
-            NodeData::Element(ref mut e) => {
+        self.update(|node| {
+            if let NodeData::Element(ref mut e) = node.data {
                 let mut attr = e.attrs.iter_mut().find(|attr| &attr.name.local == "class");
 
                 let set: HashSet<String> = class
-                    .split(" ")
+                    .split(' ')
                     .map(|s| s.trim())
-                    .filter(|s| s.len() > 0)
+                    .filter(|s| !s.is_empty())
                     .map(|s| s.to_string())
                     .collect();
 
@@ -807,29 +795,28 @@ impl<'a> Node<'a> {
                     e.attrs.push(Attribute { name, value })
                 }
             }
-            _ => (),
         })
     }
 
     pub fn remove_class(&self, class: &str) {
-        if class.trim().len() == 0 {
+        if class.trim().is_empty() {
             return;
         }
 
-        self.update(|node| match node.data {
-            NodeData::Element(ref mut e) => {
+        self.update(|node| {
+            if let NodeData::Element(ref mut e) = node.data {
                 e.attrs
                     .iter_mut()
                     .find(|attr| &attr.name.local == "class")
                     .map(|attr| {
                         let mut set: HashSet<&str> = attr
                             .value
-                            .split(" ")
+                            .split(' ')
                             .map(|s| s.trim())
-                            .filter(|s| s.len() > 0)
+                            .filter(|s| !s.is_empty())
                             .collect();
 
-                        let removes = class.split(" ").map(|s| s.trim()).filter(|s| s.len() > 0);
+                        let removes = class.split(' ').map(|s| s.trim()).filter(|s| !s.is_empty());
 
                         for remove in removes {
                             set.remove(remove);
@@ -839,7 +826,6 @@ impl<'a> Node<'a> {
                             StrTendril::from(set.into_iter().collect::<Vec<&str>>().join(" "));
                     });
             }
-            _ => (),
         })
     }
 
@@ -856,7 +842,7 @@ impl<'a> Node<'a> {
 
     pub fn attrs(&self) -> Vec<Attribute> {
         self.query(|node| match node.data {
-            NodeData::Element(ref e) => e.attrs.iter().map(|attr| attr.clone()).collect(),
+            NodeData::Element(ref e) => e.attrs.to_vec(),
             _ => vec![],
         })
     }
@@ -939,7 +925,7 @@ impl<'a> Node<'a> {
                     }
                 }
 
-                NodeData::Text { ref contents } => text.push_tendril(&contents),
+                NodeData::Text { ref contents } => text.push_tendril(contents),
 
                 _ => continue,
             }
@@ -1040,7 +1026,7 @@ impl<'a> Serialize for SerializableNodeRef<'a> {
             IncludeNode => vec![SerializeOp::Open(id)],
             ChildrenOnly(_) => children_of!(nodes, id)
                 .into_iter()
-                .map(|h| SerializeOp::Open(h))
+                .map(SerializeOp::Open)
                 .collect(),
         };
 
@@ -1061,9 +1047,9 @@ impl<'a> Serialize for SerializableNodeRef<'a> {
 
                         Ok(())
                     }
-                    NodeData::Doctype { ref name, .. } => serializer.write_doctype(&name),
-                    NodeData::Text { ref contents } => serializer.write_text(&contents),
-                    NodeData::Comment { ref contents } => serializer.write_comment(&contents),
+                    NodeData::Doctype { ref name, .. } => serializer.write_doctype(name),
+                    NodeData::Text { ref contents } => serializer.write_text(contents),
+                    NodeData::Comment { ref contents } => serializer.write_comment(contents),
                     NodeData::ProcessingInstruction {
                         ref target,
                         ref contents,

@@ -27,6 +27,9 @@
 //!
 
 // #![deny(missing_docs)] // TODO: add this back in.
+extern crate html5ever;
+
+mod css;
 mod document;
 mod dom_tree;
 mod element;
