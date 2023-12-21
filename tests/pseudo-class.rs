@@ -16,7 +16,7 @@ fn test_pseudo_class_has() {
     assert!(text == "Three");
 }
 
-#[test ]
+#[test]
 fn test_pseudo_class_has_any_link() {
     let html = r#"
     <div>
@@ -30,4 +30,4 @@ fn test_pseudo_class_has_any_link() {
 
     let text: &str = &span.text();
     assert!(text == "Three");
-}  
+}

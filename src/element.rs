@@ -113,15 +113,11 @@ impl<'a> selectors::Element for Node<'a> {
         })
     }
 
-    fn match_non_ts_pseudo_class<F>(
+    fn match_non_ts_pseudo_class(
         &self,
         pseudo: &<Self::Impl as SelectorImpl>::NonTSPseudoClass,
         context: &mut MatchingContext<Self::Impl>,
-        _flags_setter: &mut F,
-    ) -> bool
-    where
-        F: FnMut(&Self, ElementSelectorFlags),
-    {
+    ) -> bool {
         use self::NonTSPseudoClass::*;
         match pseudo {
             Active | Focus | Hover | Enabled | Disabled | Checked | Indeterminate | Visited => {
@@ -225,6 +221,15 @@ impl<'a> selectors::Element for Node<'a> {
     fn is_root(&self) -> bool {
         self.is_document()
     }
+
+    fn first_element_child(&self) -> Option<Self> {
+        self.children()
+            .iter()
+            .find(|&child| child.is_element())
+            .cloned()
+    }
+
+    fn apply_selector_flags(&self, _flags: ElementSelectorFlags) {}
 }
 
 fn has_descendant_match(

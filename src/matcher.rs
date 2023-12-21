@@ -4,10 +4,10 @@ use crate::dom_tree::{NodeData, NodeId, NodeRef};
 use cssparser::ParseError;
 use cssparser::{self, CowRcStr, SourceLocation, ToCss};
 use html5ever::Namespace;
-use selectors::matching;
 use selectors::parser::{self, SelectorList, SelectorParseErrorKind};
 use selectors::visitor;
 use selectors::Element;
+use selectors::{matching, NthIndexCache};
 use std::fmt;
 
 use fxhash::FxBuildHasher;
@@ -26,19 +26,26 @@ impl Matcher {
     pub fn new(sel: &str) -> Result<Self, ParseError<SelectorParseErrorKind>> {
         let mut input = cssparser::ParserInput::new(sel);
         let mut parser = cssparser::Parser::new(&mut input);
-        selectors::parser::SelectorList::parse(&InnerSelectorParser, &mut parser)
-            .map(|selector_list| Matcher { selector_list })
+        selectors::parser::SelectorList::parse(
+            &InnerSelectorParser,
+            &mut parser,
+            parser::ParseRelative::ForNesting,
+        )
+        .map(|selector_list| Matcher { selector_list })
     }
 
     pub(crate) fn match_element<E>(&self, element: &E) -> bool
     where
         E: Element<Impl = InnerSelector>,
     {
+        let mut nth_cache = NthIndexCache::default();
         let mut ctx = matching::MatchingContext::new(
             matching::MatchingMode::Normal,
             None,
-            None,
+            &mut nth_cache,
             matching::QuirksMode::NoQuirks,
+            matching::NeedsSelectorFlags::No,
+            matching::IgnoreNthChildForInvalidation::No,
         );
 
         matching::matches_selector_list(&self.selector_list, element, &mut ctx)
@@ -175,7 +182,8 @@ impl<'i> parser::Parser<'i> for InnerSelectorParser {
         arguments: &mut cssparser::Parser<'i, 't>,
     ) -> Result<NonTSPseudoClass, ParseError<'i, Self::Error>> {
         if name.starts_with("has") {
-            let list: SelectorList<InnerSelector> = SelectorList::parse(self, arguments)?;
+            let list: SelectorList<InnerSelector> =
+                SelectorList::parse(self, arguments, parser::ParseRelative::No)?;
             Ok(NonTSPseudoClass::Has(list))
         } else {
             Err(arguments.new_custom_error(
@@ -189,7 +197,7 @@ impl<'i> parser::Parser<'i> for InnerSelectorParser {
 pub struct InnerSelector;
 
 impl parser::SelectorImpl for InnerSelector {
-    type ExtraMatchingData = String;
+    type ExtraMatchingData<'a> = ();
     type AttrValue = CssString;
     type Identifier = CssLocalName;
     type LocalName = CssLocalName;
@@ -239,6 +247,12 @@ impl ToCss for NonTSPseudoClass {
                 dest.write_str(")")
             }
         }
+    }
+
+    fn to_css_string(&self) -> String {
+        let mut s = String::new();
+        self.to_css(&mut s).unwrap();
+        s
     }
 }
 
