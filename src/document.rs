@@ -15,6 +15,21 @@ use std::collections::HashSet;
 use tendril::StrTendril;
 use tendril::TendrilSink;
 
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+/// Parser options
+pub struct ParseOptions {
+    /// Keep the content of `<template>` tags in place.
+    pub keep_templates: bool,
+}
+
+impl ParseOptions {
+    pub fn keep_templates(mut self, keep_templates: bool) -> Self {
+        self.keep_templates = keep_templates;
+        self
+    }
+}
+
 /// Document represents an HTML document to be manipulated.
 pub struct Document {
     /// The document's dom tree.
@@ -25,6 +40,9 @@ pub struct Document {
 
     /// The document's quirks mode.
     pub quirks_mode: QuirksMode,
+
+    /// Keep content of templates
+    pub keep_templates: bool,
 }
 
 impl Default for Document {
@@ -33,6 +51,7 @@ impl Default for Document {
             tree: Tree::new(NodeData::Document),
             errors: vec![],
             quirks_mode: tree_builder::NoQuirks,
+            keep_templates: false,
         }
     }
 }
@@ -59,6 +78,23 @@ impl Document {
     /// Return the underlying root document node.
     pub fn root(&self) -> NodeRef<NodeData> {
         self.tree.root()
+    }
+
+    /// Parse a document allowing to provide additional options
+    pub fn parse<S>(options: ParseOptions, html: S) -> Self
+    where
+        S: AsRef<str>,
+    {
+        let ParseOptions { keep_templates } = options;
+
+        parse_document(
+            Document {
+                keep_templates,
+                ..Document::default()
+            },
+            Default::default(),
+        )
+        .one(html.as_ref())
     }
 }
 
@@ -87,14 +123,19 @@ impl TreeSink for Document {
 
     // Get a handle to a template's template contents. The tree builder promises this will never be called with
     // something else than a template element.
+    // If templates are kept in place, return the actual node id.
     fn get_template_contents(&mut self, target: &NodeId) -> NodeId {
-        self.tree.query_node(target, |node| match node.data {
-            NodeData::Element(Element {
-                template_contents: Some(ref contents),
-                ..
-            }) => contents.clone(),
-            _ => panic!("not a template element!"),
-        })
+        if self.keep_templates {
+            target.clone()
+        } else {
+            self.tree.query_node(target, |node| match node.data {
+                NodeData::Element(Element {
+                    template_contents: Some(ref contents),
+                    ..
+                }) => contents.clone(),
+                _ => panic!("not a template element!"),
+            })
+        }
     }
 
     // Set the document's quirks mode.
@@ -126,7 +167,7 @@ impl TreeSink for Document {
         attrs: Vec<Attribute>,
         flags: ElementFlags,
     ) -> NodeId {
-        let template_contents = if flags.template {
+        let template_contents = if !self.keep_templates && flags.template {
             Some(self.tree.create_node(NodeData::Document))
         } else {
             None
@@ -279,6 +320,12 @@ impl TreeSink for Document {
     // Remove all the children from node and append them to new_parent.
     fn reparent_children(&mut self, node: &NodeId, new_parent: &NodeId) {
         self.tree.reparent_children_of(node, Some(*new_parent));
+    }
+}
+
+impl Document {
+    pub fn get_node(&self, id: &NodeId) -> NodeData {
+        self.tree.query_node(id, |node| node.data.clone())
     }
 }
 
