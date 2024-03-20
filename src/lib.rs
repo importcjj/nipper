@@ -38,6 +38,7 @@ mod selection;
 mod traversal;
 
 pub use document::Document;
+pub use document::ParseOptions;
 pub use dom_tree::Node;
 #[doc(hidden)]
 pub use dom_tree::NodeId;
